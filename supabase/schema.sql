@@ -31,6 +31,13 @@ create trigger on_auth_user_created
   after insert on auth.users
   for each row execute function public.handle_new_user();
 
+-- 兼容：为执行本脚本前“已注册”的账号补建 profiles（触发器不会回溯已有账号）
+insert into public.profiles (id, email)
+select u.id, u.email
+from auth.users u
+where not exists (select 1 from public.profiles p where p.id = u.id)
+on conflict (id) do nothing;
+
 -- ============ 统一动态 ============
 create table if not exists public.events (
   id uuid primary key default gen_random_uuid(),
@@ -76,6 +83,13 @@ create policy "events_update_self"
 drop policy if exists "events_delete_self" on public.events;
 create policy "events_delete_self"
   on public.events for delete to authenticated using (auth.uid() = actor_id);
+
+-- ============ 表级权限（GRANT）============
+-- 注意：RLS 只决定“能访问哪些行”，GRANT 才决定“能否访问这张表”，两者缺一不可
+-- profiles：登录可读、只能改自己（新增由触发器 security definer 完成，不授予 insert/delete）
+grant select, update on public.profiles to authenticated;
+-- events：登录可读写
+grant select, insert, update, delete on public.events to authenticated;
 
 -- ============================================================
 -- 初始化两个已有账号的性别（请把下面两个邮箱替换成你们的真实邮箱后执行）

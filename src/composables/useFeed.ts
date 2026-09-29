@@ -14,26 +14,51 @@ async function ensureMe(): Promise<Profile | null> {
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return null
 
-  const { data } = await supabase
+  const { data, error } = await supabase
     .from('profiles')
     .select('*')
     .eq('id', user.id)
     .single()
 
+  if (error) {
+    console.error('[青桃] 读取档案失败：', error)
+    return null
+  }
+
   myProfile.value = data as Profile
   return myProfile.value
 }
 
-/** 拉取动态流（最新在前） */
+/** 拉取动态流（最新在前）；先读本地缓存立即渲染，再后台更新，避免刷新白屏卡顿 */
+const CACHE_KEY = 'qingtao_feed_v1'
+
 async function loadEvents(): Promise<void> {
   loading.value = true
   await ensureMe()
+
+  // 1) 先放缓存（stale-while-revalidate）
+  try {
+    const cached = localStorage.getItem(CACHE_KEY)
+    if (cached) events.value = JSON.parse(cached) as CoupleEvent[]
+  } catch {
+    /* 缓存不可用就忽略 */
+  }
+
+  // 2) 再拉最新数据
   const { data } = await supabase
     .from('events')
     .select('*')
     .order('created_at', { ascending: false })
     .limit(30)
-  events.value = (data ?? []) as CoupleEvent[]
+
+  if (data) {
+    events.value = data as CoupleEvent[]
+    try {
+      localStorage.setItem(CACHE_KEY, JSON.stringify(events.value))
+    } catch {
+      /* 写满就忽略 */
+    }
+  }
   loading.value = false
 }
 
@@ -55,11 +80,14 @@ async function publishEvent(input: {
     meta: input.meta ?? null
   })
 
-  if (!error) {
-    // 立即把新动态插到列表最前，保证当前页数据最新
-    await loadEvents()
+  if (error) {
+    console.error('[青桃] 写入动态失败：', error)
+    return { error }
   }
-  return { error }
+
+  // 立即刷新，保证当前页数据最新
+  await loadEvents()
+  return { error: null }
 }
 
 export function useFeed() {

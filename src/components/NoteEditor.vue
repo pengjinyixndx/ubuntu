@@ -26,7 +26,6 @@
       <!-- 底部提示 -->
       <footer class="editor-foot">
         <span v-if="errMsg" class="foot-err">{{ errMsg }}</span>
-        <span v-else-if="justSaved" class="foot-ok">已收进时光里</span>
         <span v-else class="foot-count">{{ text.length }} 字</span>
       </footer>
     </div>
@@ -43,7 +42,6 @@ const { publishEvent } = useFeed()
 
 const text = ref('')
 const saving = ref(false)
-const justSaved = ref(false)
 const errMsg = ref('')
 
 const canSave = computed(() => text.value.trim().length > 0 && !saving.value)
@@ -56,25 +54,32 @@ async function save() {
   saving.value = false
 
   if (error) {
-    errMsg.value = '没贴上去，再试一次'
+    const msg = typeof error === 'string' ? error : (error as { message?: string })?.message
+    errMsg.value = msg ? `没贴上去：${msg}` : '没贴上去，再试一次'
     return
   }
+  // 发布成功：清空并关闭，回到记录页
   text.value = ''
-  justSaved.value = true
-  window.setTimeout(() => {
-    justSaved.value = false
-  }, 2000)
+  emit('close')
 }
 </script>
 
 <style scoped>
 .overlay {
   position: fixed;
-  inset: 0;
+  top: 0;
+  bottom: 0;
+  left: 0;
+  right: 0;
   z-index: 100;
   display: flex;
   flex-direction: column;
-  background-color: var(--paper);
+  width: 100%;
+  max-width: var(--app-w);
+  margin: 0 auto;
+  background-color: var(--photo);
+  border-left: 1px solid var(--line-strong);
+  border-right: 1px solid var(--line-strong);
   padding-top: env(safe-area-inset-top);
 }
 
@@ -171,12 +176,6 @@ async function save() {
   font-family: var(--font-song);
   font-size: var(--fs-sm);
   color: var(--brick);
-}
-
-.foot-ok {
-  font-family: var(--font-song);
-  font-size: var(--fs-sm);
-  color: var(--caramel);
 }
 
 .foot-count {

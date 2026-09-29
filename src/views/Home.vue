@@ -28,17 +28,35 @@
     </div>
 
     <!-- 横向卡片流：最新卡片居中，左右露出相邻卡片 -->
-    <section v-if="myProfile && events.length" class="feed-deck">
+    <section
+      v-if="myProfile && (events.length || loading)"
+      ref="deckRef"
+      class="feed-deck"
+      @scroll.passive="onScroll"
+      @pointerdown="onDown"
+      @pointermove="onMove"
+      @pointerup="onUp"
+      @pointerleave="onUp"
+    >
+      <!-- 首次加载骨架 -->
+      <div v-if="loading && !events.length" class="skeleton-card">
+        <div class="sk-line w40"></div>
+        <div class="sk-line"></div>
+        <div class="sk-line short"></div>
+        <div class="sk-line short"></div>
+      </div>
+
       <EventCard
-        v-for="ev in events"
+        v-for="(ev, i) in events"
         :key="ev.id"
         :event="ev"
         :me="myProfile"
+        :distance="Math.abs(i - activeIndex)"
       />
     </section>
 
     <!-- 空状态 -->
-    <section v-else class="feed-empty">
+    <section v-else-if="!loading" class="feed-empty">
       <PenLine :size="34" :stroke-width="1.2" class="empty-icon" />
       <span class="empty-text">还没有记录，去「记录」写下第一条吧</span>
     </section>
@@ -46,7 +64,7 @@
 </template>
 
 <script setup lang="ts">
-import { onMounted } from 'vue'
+import { onMounted, ref, nextTick } from 'vue'
 import { PenLine } from 'lucide-vue-next'
 import TopDecor from '../components/TopDecor.vue'
 import EventCard from '../components/EventCard.vue'
@@ -54,14 +72,57 @@ import { getTogetherDays } from '../composables/useTogether'
 import { getDailyBlessing } from '../composables/useDailyBlessing'
 import { useFeed } from '../composables/useFeed'
 
-// 内置起始日动态计算，当前应为第 98 天
+// 内置起始日动态计算
 const days = getTogetherDays()
 // 每天轮换一句祝福
 const blessing = getDailyBlessing()
 
-// 动态流：每次进入首页重新拉取，保证看到最新内容
-const { events, myProfile, loadEvents } = useFeed()
-onMounted(loadEvents)
+// 动态流
+const { events, myProfile, loading, loadEvents } = useFeed()
+
+const deckRef = ref<HTMLElement | null>(null)
+const activeIndex = ref(0)
+
+// 每张卡片（含间距）的步长，用于根据 scrollLeft 反推居中卡片
+function stepPx(): number {
+  const el = deckRef.value
+  const card = el?.querySelector('.feed-card') as HTMLElement | null
+  if (!el || !card) return 1
+  return card.offsetWidth + 12 // 与 --card-gap 一致
+}
+
+function onScroll() {
+  const el = deckRef.value
+  if (!el) return
+  activeIndex.value = Math.max(0, Math.round(el.scrollLeft / stepPx()))
+}
+
+// PC 端鼠标按住拖拽（真机触摸由浏览器原生处理）
+let dragging = false
+let startX = 0
+let startScroll = 0
+function onDown(e: PointerEvent) {
+  const el = deckRef.value
+  if (!el || e.pointerType !== 'mouse') return
+  dragging = true
+  startX = e.pageX
+  startScroll = el.scrollLeft
+}
+function onMove(e: PointerEvent) {
+  const el = deckRef.value
+  if (!dragging || !el || e.pointerType !== 'mouse') return
+  el.scrollLeft = startScroll - (e.pageX - startX)
+}
+function onUp() {
+  dragging = false
+}
+
+onMounted(async () => {
+  await loadEvents()
+  await nextTick()
+  activeIndex.value = 0
+  if (deckRef.value) deckRef.value.scrollLeft = 0
+})
 </script>
 
 <style scoped>
@@ -83,7 +144,7 @@ onMounted(loadEvents)
 .tape {
   position: absolute;
   top: -11px;
-  left: 50%;
+  left:50%;
   width: 58px;
   height: 20px;
   transform: translateX(-50%) rotate(-3deg);
@@ -117,7 +178,7 @@ onMounted(loadEvents)
   align-items: baseline;
   justify-content: center;
   gap: 6px;
-  margin: 8px 0 8px;
+  margin: 8px 0;
 }
 
 .days-num {
@@ -187,17 +248,64 @@ onMounted(loadEvents)
 /* —— 横向卡片流 —— */
 .feed-deck {
   display: flex;
-  gap: 12px;
-  margin: 0 -20px; /* 延伸到屏幕边缘，露边更自然 */
-  padding: 6px 11% 20px;
+  gap: var(--card-gap);
+  margin: 0 -20px; /* 延伸到手机列边缘，露边更自然 */
+  padding: 10px calc((var(--app-w) - var(--card-w)) / 2) 22px;
   overflow-x: auto;
   scroll-snap-type: x mandatory;
   scrollbar-width: none;
   -webkit-overflow-scrolling: touch;
+  touch-action: pan-x;
+  cursor: grab;
+}
+
+.feed-deck:active {
+  cursor: grabbing;
 }
 
 .feed-deck::-webkit-scrollbar {
   display: none;
+}
+
+/* —— 首次加载骨架 —— */
+.skeleton-card {
+  flex: 0 0 var(--card-w);
+  scroll-snap-align: center;
+  padding: 18px 16px;
+  background-color: var(--photo);
+  border: var(--border);
+  border-radius: var(--r-md);
+}
+
+.sk-line {
+  height: 14px;
+  margin-bottom: 16px;
+  border-radius: 4px;
+  background: linear-gradient(
+    90deg,
+    rgba(180, 150, 100, 0.12) 25%,
+    rgba(180, 150, 100, 0.26) 37%,
+    rgba(180, 150, 100, 0.12) 63%
+  );
+  background-size: 400% 100%;
+  animation: shimmer 1.4s ease infinite;
+}
+
+.sk-line.w40 {
+  width: 40%;
+}
+
+.sk-line.short {
+  width: 72%;
+}
+
+@keyframes shimmer {
+  0% {
+    background-position: 100% 0;
+  }
+  100% {
+    background-position: 0 0;
+  }
 }
 
 /* —— 空状态 —— */

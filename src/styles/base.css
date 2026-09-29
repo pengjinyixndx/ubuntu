@@ -25,7 +25,8 @@ body {
   font-size: var(--fs-base);
   line-height: 1.7;
   color: var(--ink);
-  background-color: var(--paper);
+  /* 宽屏下两侧用更深的纸色，衬托中间手机列 */
+  background-color: var(--paper-deep);
   -webkit-font-smoothing: antialiased;
   text-rendering: optimizeLegibility;
 }

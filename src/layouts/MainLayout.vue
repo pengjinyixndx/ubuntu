@@ -51,6 +51,12 @@ const switchTab = (path: string) => {
   display: flex;
   flex-direction: column;
   height: 100vh;
+  max-width: 480px;
+  margin: 0 auto;
+  position: relative;
+  background-color: var(--paper);
+  border-left: 1px solid var(--line-strong);
+  border-right: 1px solid var(--line-strong);
 }
 @supports (height: 100dvh) {
   .main-layout {
@@ -70,8 +76,10 @@ const switchTab = (path: string) => {
 .tab-bar {
   position: fixed;
   bottom: 0;
-  left: 0;
-  right: 0;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 100%;
+  max-width: 480px;
   height: var(--tabbar-h);
   display: flex;
   background-color: var(--paper);
