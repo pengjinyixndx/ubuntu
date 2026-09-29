@@ -22,13 +22,16 @@
 
 <script setup lang="ts">
 import { useRouter } from 'vue-router'
+import { supabase } from '../lib/supabase'
+
 
 const router = useRouter()
 
-const handleLogout = () => {
-  localStorage.removeItem('token') // 清除登录态
+const handleLogout = async () => {
+  await supabase.auth.signOut()
   router.replace('/login')
 }
+
 </script>
 
 <style scoped>
