@@ -1,7 +1,7 @@
 <template>
   <div class="login-wrap">
     <div class="card">
-      <h2>双人私密空间登录</h2>
+      <h2>青桃</h2>
       <input
         v-model="email"
         type="email"

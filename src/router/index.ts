@@ -1,6 +1,7 @@
 import { createRouter, createWebHistory } from 'vue-router'
 import type { RouteRecordRaw } from 'vue-router'
 import MainLayout from '../layouts/MainLayout.vue'
+import { supabase } from '../lib/supabase' // 引入你的 supabase 实例
 
 const routes: RouteRecordRaw[] = [
   {
@@ -48,10 +49,12 @@ const router = createRouter({
   routes
 })
 
-// 全局前置守卫：登录鉴权
-router.beforeEach((to, _from, next) => {
-  const isLoggedIn = localStorage.getItem('token') // 替换成你实际的登录态判断，比如supabase的auth校验
-  
+// 全局前置守卫：使用 Supabase 官方接口校验登录态
+router.beforeEach(async (to, _from, next) => {
+  // 调用 getUser 获取当前登录用户，自动校验会话有效性
+  const { data: { user } } = await supabase.auth.getUser()
+  const isLoggedIn = !!user
+
   if (to.meta.requiresAuth && !isLoggedIn) {
     next('/login')
   } else if (to.path === '/login' && isLoggedIn) {
