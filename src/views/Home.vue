@@ -13,6 +13,10 @@
           <span class="days-unit">天</span>
         </div>
         <div class="days-since">SINCE&nbsp;2026.06.24</div>
+        <div class="blessing">
+          <p class="blessing-text">{{ blessing.text }}</p>
+          <p class="blessing-source">—— {{ blessing.source }}</p>
+        </div>
       </div>
     </section>
 
@@ -33,14 +37,17 @@
 <script setup lang="ts">
 import TopDecor from '../components/TopDecor.vue'
 import { getTogetherDays } from '../composables/useTogether'
+import { getDailyBlessing } from '../composables/useDailyBlessing'
 
 // 内置起始日动态计算，当前应为第 98 天
 const days = getTogetherDays()
+// 每天轮换一句祝福
+const blessing = getDailyBlessing()
 </script>
 
 <style scoped>
 .home-page {
-  padding: 18px 20px 24px;
+  padding: calc(16px + env(safe-area-inset-top)) 20px 24px;
 }
 
 /* —— 天数邮票卡片 —— */
@@ -113,6 +120,29 @@ const days = getTogetherDays()
   font-size: var(--fs-xs);
   letter-spacing: 2px;
   color: var(--caramel);
+}
+
+/* —— 每日祝福 —— */
+.blessing {
+  margin-top: 14px;
+  padding-top: 12px;
+  border-top: 1px dashed var(--line);
+}
+
+.blessing-text {
+  margin: 0;
+  font-family: var(--font-serif);
+  font-size: var(--fs-sm);
+  line-height: 1.75;
+  color: var(--ink-soft);
+}
+
+.blessing-source {
+  margin: 5px 0 0;
+  font-family: var(--font-typewriter);
+  font-size: var(--fs-xs);
+  letter-spacing: 0.5px;
+  color: var(--faint);
 }
 
 /* —— 分隔 —— */

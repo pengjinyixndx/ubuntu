@@ -1,15 +1,5 @@
 <template>
   <div class="main-layout">
-    <!-- 信纸抬头 -->
-    <header class="app-header">
-      <div class="letterhead">
-        <span class="head-line"></span>
-        <span class="brand">QINGTAO</span>
-        <span class="head-line"></span>
-      </div>
-      <div class="head-sub">—— 两个人的时光信笺 ——</div>
-    </header>
-
     <!-- 页面内容区 -->
     <main class="content">
       <router-view v-slot="{ Component }">
@@ -66,44 +56,6 @@ const switchTab = (path: string) => {
   .main-layout {
     height: 100dvh;
   }
-}
-
-/* —— 信纸抬头 —— */
-.app-header {
-  flex-shrink: 0;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  gap: 3px;
-  padding: 10px 16px 8px;
-  border-bottom: var(--border-dashed);
-}
-
-.letterhead {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-}
-
-.head-line {
-  width: 30px;
-  height: 1px;
-  background-color: var(--line-strong);
-}
-
-.brand {
-  font-family: var(--font-typewriter);
-  font-size: var(--fs-md);
-  letter-spacing: 5px;
-  color: var(--caramel);
-}
-
-.head-sub {
-  font-family: var(--font-song);
-  font-size: var(--fs-xs);
-  letter-spacing: 2px;
-  color: var(--muted);
 }
 
 /* —— 内容区 —— */
