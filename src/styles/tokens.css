@@ -1,0 +1,68 @@
+/* ============================================================
+   青桃 · 胶片相纸风 设计变量（Design Tokens）
+   配色取自做旧纸张、墨色、焦糖与暗砖红，全部低饱和、无彩色渐变
+   ============================================================ */
+:root {
+  /* —— 纸张与载体 —— */
+  --paper: #f3ead4;        /* 主纸底：奶油米色 */
+  --paper-deep: #ebdfc2;   /* 纸底加深：层叠区/底部栏 */
+  --photo: #fdfaf1;        /* 相纸面：偏暖的纸白，非纯白 */
+
+  /* —— 墨色与文字 —— */
+  --ink: #2b251d;          /* 主墨色：暖黑 */
+  --ink-soft: #4c4234;     /* 次级墨色 */
+  --muted: #897b61;        /* 次要文字：暖灰褐 */
+  --faint: #b3a588;        /* 更浅的说明文字 */
+
+  /* —— 点缀色 —— */
+  --caramel: #98663a;      /* 焦糖棕：图标激活、强调 */
+  --brick: #ad4f38;        /* 暗砖红：印章、错误、少量点缀 */
+
+  /* —— 描边 —— */
+  --line: #d7c7a4;         /* 浅暖褐描边 */
+  --line-strong: #c3b189;  /* 稍深描边 */
+  --tape: rgba(224, 201, 146, 0.62); /* 半透明胶带 */
+
+  /* —— 字体族 —— */
+  --font-typewriter: 'Special Elite', 'Courier New', Courier, monospace;
+  --font-serif: 'Playfair Display', 'Songti SC', 'STSong', 'SimSun', serif;
+  --font-song: 'Songti SC', 'STSong', 'SimSun', 'Noto Serif SC', serif;
+  --font-hand: 'STXingkai', '华文行楷', 'Kaiti SC', 'KaiTi', '楷体', 'Ma Shan Zheng', cursive;
+  --font-body: 'Songti SC', 'STSong', 'SimSun', serif;
+
+  /* —— 字号字阶 —— */
+  --fs-xs: 11px;
+  --fs-sm: 13px;
+  --fs-base: 15px;
+  --fs-md: 17px;
+  --fs-lg: 20px;
+  --fs-xl: 26px;
+  --fs-xxl: 34px;
+  --fs-display: 68px;
+
+  /* —— 间距（8px 基准） —— */
+  --sp-1: 4px;
+  --sp-2: 8px;
+  --sp-3: 12px;
+  --sp-4: 16px;
+  --sp-5: 24px;
+  --sp-6: 32px;
+  --sp-7: 48px;
+
+  /* —— 圆角：相纸近乎直角，避免 AI 感的大圆角 —— */
+  --r-sm: 2px;
+  --r-md: 4px;
+
+  /* —— 描边快捷 —— */
+  --border: 1px solid var(--line);
+  --border-strong: 1px solid var(--line-strong);
+  --border-dashed: 1px dashed var(--line-strong);
+
+  /* —— 阴影：暖调、柔和，模拟相纸落在纸上 —— */
+  --shadow-photo: 0 10px 22px rgba(84, 62, 30, 0.2), 0 2px 6px rgba(84, 62, 30, 0.1);
+  --shadow-card: 0 4px 14px rgba(84, 62, 30, 0.14);
+
+  /* —— 布局尺寸 —— */
+  --header-h: 58px;
+  --tabbar-h: 66px;
+}
