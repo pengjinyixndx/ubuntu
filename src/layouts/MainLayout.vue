@@ -27,15 +27,15 @@
 
 <script setup lang="ts">
 import { useRoute, useRouter } from 'vue-router'
-import { Home, NotebookPen, Images, User } from 'lucide-vue-next'
+import { Home, PenLine, HeartHandshake, User } from 'lucide-vue-next'
 
 const route = useRoute()
 const router = useRouter()
 
 const tabs = [
   { name: '首页', path: '/home', icon: Home },
-  { name: '日记', path: '/diary', icon: NotebookPen },
-  { name: '相册', path: '/album', icon: Images },
+  { name: '记录', path: '/record', icon: PenLine },
+  { name: '请愿', path: '/petition', icon: HeartHandshake },
   { name: '我的', path: '/profile', icon: User }
 ]
 

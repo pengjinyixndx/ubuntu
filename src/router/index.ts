@@ -23,16 +23,16 @@ const routes: RouteRecordRaw[] = [
         meta: { title: '首页', requiresAuth: true }
       },
       {
-        path: 'diary',
-        name: 'Diary',
-        component: () => import('../views/Diary.vue'),
-        meta: { title: '日记', requiresAuth: true }
+        path: 'record',
+        name: 'Record',
+        component: () => import('../views/Record.vue'),
+        meta: { title: '记录', requiresAuth: true }
       },
       {
-        path: 'album',
-        name: 'Album',
-        component: () => import('../views/Album.vue'),
-        meta: { title: '相册', requiresAuth: true }
+        path: 'petition',
+        name: 'Petition',
+        component: () => import('../views/Petition.vue'),
+        meta: { title: '请愿', requiresAuth: true }
       },
       {
         path: 'profile',
