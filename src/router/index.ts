@@ -1,30 +1,64 @@
 import { createRouter, createWebHistory } from 'vue-router'
-import { supabase } from '../lib/supabase'
+import type { RouteRecordRaw } from 'vue-router'
+import MainLayout from '../layouts/MainLayout.vue'
 
-// 页面组件
-const Login = () => import('../views/Login.vue')
-const Home = () => import('../views/Home.vue')
+const routes: RouteRecordRaw[] = [
+  {
+    path: '/login',
+    name: 'Login',
+    component: () => import('../views/Login.vue'),
+    meta: { requiresAuth: false }
+  },
+  {
+    path: '/',
+    component: MainLayout,
+    redirect: '/home',
+    meta: { requiresAuth: true },
+    children: [
+      {
+        path: 'home',
+        name: 'Home',
+        component: () => import('../views/Home.vue'),
+        meta: { title: '首页', requiresAuth: true }
+      },
+      {
+        path: 'diary',
+        name: 'Diary',
+        component: () => import('../views/Diary.vue'),
+        meta: { title: '日记', requiresAuth: true }
+      },
+      {
+        path: 'album',
+        name: 'Album',
+        component: () => import('../views/Album.vue'),
+        meta: { title: '相册', requiresAuth: true }
+      },
+      {
+        path: 'profile',
+        name: 'Profile',
+        component: () => import('../views/Profile.vue'),
+        meta: { title: '我的', requiresAuth: true }
+      }
+    ]
+  }
+]
 
 const router = createRouter({
-  history: createWebHistory(import.meta.env.BASE_URL),
-  routes: [
-    {
-      path: '/login',
-      name: 'login',
-      component: Login
-    },
-    {
-      path: '/',
-      name: 'home',
-      component: Home,
-      // 路由守卫：未登录强制跳登录页
-      beforeEnter: async (to, from, next) => {
-        const { data } = await supabase.auth.getSession()
-        if (data.session) next()
-        else next('/login')
-      }
-    }
-  ]
+  history: createWebHistory(),
+  routes
+})
+
+// 全局前置守卫：登录鉴权
+router.beforeEach((to, _from, next) => {
+  const isLoggedIn = localStorage.getItem('token') // 替换成你实际的登录态判断，比如supabase的auth校验
+  
+  if (to.meta.requiresAuth && !isLoggedIn) {
+    next('/login')
+  } else if (to.path === '/login' && isLoggedIn) {
+    next('/home')
+  } else {
+    next()
+  }
 })
 
 export default router
