@@ -11,6 +11,7 @@
         :key="item.name"
         type="button"
         class="entry"
+        @click="openEntry(item)"
       >
         <span class="entry-icon"><component :is="item.icon" :size="22" :stroke-width="1.5" /></span>
         <span class="entry-body">
@@ -20,18 +21,28 @@
         <ChevronRight :size="18" :stroke-width="1.5" class="entry-arrow" />
       </button>
     </div>
+
+    <NoteEditor v-if="showNote" @close="showNote = false" />
   </div>
 </template>
 
 <script setup lang="ts">
+import { ref } from 'vue'
 import { PenLine, BookOpen, Images, CupSoda, ChevronRight } from 'lucide-vue-next'
+import NoteEditor from '../components/NoteEditor.vue'
+
+const showNote = ref(false)
 
 const entries = [
-  { name: '随笔', desc: '三两句心情，随手记下', icon: PenLine },
-  { name: '日记', desc: '完整的一篇，留给今天', icon: BookOpen },
-  { name: '照片', desc: '把这一刻装进相纸', icon: Images },
-  { name: '喝奶茶', desc: '记一杯奶茶的甜', icon: CupSoda }
+  { key: 'note', name: '随笔', desc: '三两句心情，随手记下', icon: PenLine },
+  { key: 'diary', name: '日记', desc: '完整的一篇，留给今天', icon: BookOpen },
+  { key: 'photo', name: '照片', desc: '把这一刻装进相纸', icon: Images },
+  { key: 'milktea', name: '喝奶茶', desc: '记一杯奶茶的甜', icon: CupSoda }
 ]
+
+function openEntry(item: { key: string }) {
+  if (item.key === 'note') showNote.value = true
+}
 </script>
 
 <style scoped>

@@ -27,22 +27,41 @@
       <span class="divider-line"></span>
     </div>
 
-    <!-- 横向卡片流占位（下一步实现） -->
-    <section class="feed-soon">
-      <span class="soon-text">卡片正在装订中</span>
+    <!-- 横向卡片流：最新卡片居中，左右露出相邻卡片 -->
+    <section v-if="myProfile && events.length" class="feed-deck">
+      <EventCard
+        v-for="ev in events"
+        :key="ev.id"
+        :event="ev"
+        :me="myProfile"
+      />
+    </section>
+
+    <!-- 空状态 -->
+    <section v-else class="feed-empty">
+      <PenLine :size="34" :stroke-width="1.2" class="empty-icon" />
+      <span class="empty-text">还没有记录，去「记录」写下第一条吧</span>
     </section>
   </div>
 </template>
 
 <script setup lang="ts">
+import { onMounted } from 'vue'
+import { PenLine } from 'lucide-vue-next'
 import TopDecor from '../components/TopDecor.vue'
+import EventCard from '../components/EventCard.vue'
 import { getTogetherDays } from '../composables/useTogether'
 import { getDailyBlessing } from '../composables/useDailyBlessing'
+import { useFeed } from '../composables/useFeed'
 
 // 内置起始日动态计算，当前应为第 98 天
 const days = getTogetherDays()
 // 每天轮换一句祝福
 const blessing = getDailyBlessing()
+
+// 动态流：每次进入首页重新拉取，保证看到最新内容
+const { events, myProfile, loadEvents } = useFeed()
+onMounted(loadEvents)
 </script>
 
 <style scoped>
@@ -165,19 +184,41 @@ const blessing = getDailyBlessing()
   color: var(--muted);
 }
 
-/* —— 卡片流占位 —— */
-.feed-soon {
+/* —— 横向卡片流 —— */
+.feed-deck {
   display: flex;
-  justify-content: center;
-  padding: 40px 0;
+  gap: 12px;
+  margin: 0 -20px; /* 延伸到屏幕边缘，露边更自然 */
+  padding: 6px 11% 20px;
+  overflow-x: auto;
+  scroll-snap-type: x mandatory;
+  scrollbar-width: none;
+  -webkit-overflow-scrolling: touch;
+}
+
+.feed-deck::-webkit-scrollbar {
+  display: none;
+}
+
+/* —— 空状态 —— */
+.feed-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 14px;
+  padding: 46px 20px;
   border: var(--border-dashed);
   border-radius: var(--r-sm);
 }
 
-.soon-text {
-  font-family: var(--font-hand);
-  font-size: var(--fs-xl);
+.empty-icon {
   color: var(--faint);
-  letter-spacing: 2px;
+}
+
+.empty-text {
+  font-family: var(--font-hand);
+  font-size: var(--fs-lg);
+  letter-spacing: 1px;
+  color: var(--faint);
 }
 </style>
