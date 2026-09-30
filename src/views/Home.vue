@@ -27,44 +27,48 @@
       <span class="divider-line"></span>
     </div>
 
-    <!-- 横向卡片流：最新卡片居中，左右露出相邻卡片 -->
-    <section
-      v-if="myProfile && (events.length || loading)"
-      ref="deckRef"
-      class="feed-deck"
-      @scroll.passive="onScroll"
-      @pointerdown="onDown"
-      @pointermove="onMove"
-      @pointerup="onUp"
-      @pointerleave="onUp"
-    >
-      <!-- 首次加载骨架 -->
-      <div v-if="loading && !events.length" class="skeleton-card">
+    <!-- 首次加载骨架 -->
+    <section v-if="loading && !events.length" class="deck">
+      <div class="skeleton-card">
         <div class="sk-line w40"></div>
         <div class="sk-line"></div>
         <div class="sk-line short"></div>
         <div class="sk-line short"></div>
       </div>
+    </section>
 
+    <!-- 堆叠卡片：最新在最上层，更早的在左侧层层叠放 -->
+    <section
+      v-else-if="events.length && myProfile"
+      ref="deckRef"
+      class="deck"
+      @touchstart.passive="onTouchStart"
+      @touchend="onTouchEnd"
+      @wheel="onWheel"
+    >
       <EventCard
-        v-for="(ev, i) in events"
+        v-for="(ev, i) in orderedEvents"
         :key="ev.id"
         :event="ev"
         :me="myProfile"
-        :distance="Math.abs(i - activeIndex)"
+        :current="i === activeIndex"
+        :pose="poseFor(i)"
+        @pick="jumpTo(i)"
       />
     </section>
 
     <!-- 空状态 -->
-    <section v-else-if="!loading" class="feed-empty">
-      <PenLine :size="34" :stroke-width="1.2" class="empty-icon" />
-      <span class="empty-text">还没有记录，去「记录」写下第一条吧</span>
+    <section v-else class="deck">
+      <div class="feed-empty">
+        <PenLine :size="34" :stroke-width="1.2" class="empty-icon" />
+        <span class="empty-text">还没有记录，去「记录」写下第一条吧</span>
+      </div>
     </section>
   </div>
 </template>
 
 <script setup lang="ts">
-import { onMounted, ref, nextTick } from 'vue'
+import { computed, onMounted, onUnmounted, ref, type CSSProperties } from 'vue'
 import { PenLine } from 'lucide-vue-next'
 import TopDecor from '../components/TopDecor.vue'
 import EventCard from '../components/EventCard.vue'
@@ -77,52 +81,91 @@ const days = getTogetherDays()
 // 每天轮换一句祝福
 const blessing = getDailyBlessing()
 
-// 动态流
 const { events, myProfile, loading, loadEvents } = useFeed()
 
+// 视觉上按时间正序：最左最早、最右最新
+const orderedEvents = computed(() => [...events.value].reverse())
+
 const deckRef = ref<HTMLElement | null>(null)
+const W = ref(480)
+// 当前最上层卡片的下标，默认停在最新一张
 const activeIndex = ref(0)
 
-// 每张卡片（含间距）的步长，用于根据 scrollLeft 反推居中卡片
-function stepPx(): number {
-  const el = deckRef.value
-  const card = el?.querySelector('.feed-card') as HTMLElement | null
-  if (!el || !card) return 1
-  return card.offsetWidth + 12 // 与 --card-gap 一致
+function measure() {
+  if (deckRef.value) W.value = deckRef.value.clientWidth
 }
 
-function onScroll() {
-  const el = deckRef.value
-  if (!el) return
-  activeIndex.value = Math.max(0, Math.round(el.scrollLeft / stepPx()))
+/**
+ * 计算第 i 张卡片相对当前卡片的层叠姿态。
+ * d<0 更早（堆在左），d>0 更新（在右）。
+ */
+function poseFor(i: number): CSSProperties {
+  const d = i - activeIndex.value
+  const abs = Math.abs(d)
+  const sign = d < 0 ? -1 : 1
+
+  if (abs >= 3) {
+    return {
+      transform: `translate(-50%, -50%) translateX(${sign * 0.24 * W.value}px) scale(0.86)`,
+      opacity: 0,
+      zIndex: 1,
+      pointerEvents: 'none'
+    }
+  }
+
+  const X = (([0, 0.1265, 0.203] as const)[abs] ?? 0) * W.value
+  const scale = ([1, 0.95, 0.9] as const)[abs] ?? 1
+  const opacity = ([1, 0.96, 0.6] as const)[abs] ?? 1
+
+  return {
+    transform: `translate(-50%, -50%) translateX(${sign * X}px) scale(${scale})`,
+    opacity,
+    zIndex: 20 - abs
+  }
 }
 
-// PC 端鼠标按住拖拽（真机触摸由浏览器原生处理）
-let dragging = false
-let startX = 0
-let startScroll = 0
-function onDown(e: PointerEvent) {
-  const el = deckRef.value
-  if (!el || e.pointerType !== 'mouse') return
-  dragging = true
-  startX = e.pageX
-  startScroll = el.scrollLeft
+function jumpTo(i: number) {
+  activeIndex.value = i
 }
-function onMove(e: PointerEvent) {
-  const el = deckRef.value
-  if (!dragging || !el || e.pointerType !== 'mouse') return
-  el.scrollLeft = startScroll - (e.pageX - startX)
+function prev() {
+  activeIndex.value = Math.max(0, activeIndex.value - 1)
 }
-function onUp() {
-  dragging = false
+function next() {
+  activeIndex.value = Math.min(orderedEvents.value.length - 1, activeIndex.value + 1)
+}
+
+// 触摸：手指向右滑 -> 看左边更早；向左滑 -> 看右边更新
+let touchX = 0
+function onTouchStart(e: TouchEvent) {
+  touchX = e.touches[0]?.clientX ?? 0
+}
+function onTouchEnd(e: TouchEvent) {
+  const dx = (e.changedTouches[0]?.clientX ?? 0) - touchX
+  if (Math.abs(dx) < 40) return
+  if (dx > 0) prev()
+  else next()
+}
+
+// PC 触摸板/鼠标横向滚动切换（带节流）
+let lastWheel = 0
+function onWheel(e: WheelEvent) {
+  const delta = Math.abs(e.deltaX) >= Math.abs(e.deltaY) ? e.deltaX : (e.shiftKey ? e.deltaY : 0)
+  if (Math.abs(delta) < 12) return
+  const now = Date.now()
+  if (now - lastWheel < 350) return
+  lastWheel = now
+  if (delta > 0) next()
+  else prev()
 }
 
 onMounted(async () => {
+  measure()
+  window.addEventListener('resize', measure)
   await loadEvents()
-  await nextTick()
-  activeIndex.value = 0
-  if (deckRef.value) deckRef.value.scrollLeft = 0
+  activeIndex.value = Math.max(0, orderedEvents.value.length - 1)
 })
+
+onUnmounted(() => window.removeEventListener('resize', measure))
 </script>
 
 <style scoped>
@@ -144,7 +187,7 @@ onMounted(async () => {
 .tape {
   position: absolute;
   top: -11px;
-  left:50%;
+  left: 50%;
   width: 58px;
   height: 20px;
   transform: translateX(-50%) rotate(-3deg);
@@ -230,7 +273,7 @@ onMounted(async () => {
   display: flex;
   align-items: center;
   gap: 12px;
-  margin: 26px 0 22px;
+  margin: 26px 0 18px;
 }
 
 .divider-line {
@@ -245,36 +288,24 @@ onMounted(async () => {
   color: var(--muted);
 }
 
-/* —— 横向卡片流 —— */
-.feed-deck {
-  display: flex;
-  gap: var(--card-gap);
-  margin: 0 -20px; /* 延伸到手机列边缘，露边更自然 */
-  padding: 10px calc((var(--app-w) - var(--card-w)) / 2) 22px;
-  overflow-x: auto;
-  scroll-snap-type: x mandatory;
-  scrollbar-width: none;
-  -webkit-overflow-scrolling: touch;
-  touch-action: pan-x;
-  cursor: grab;
+/* —— 堆叠卡片容器 —— */
+.deck {
+  position: relative;
+  height: 392px;
+  margin: 0 -20px;
 }
 
-.feed-deck:active {
-  cursor: grabbing;
-}
-
-.feed-deck::-webkit-scrollbar {
-  display: none;
-}
-
-/* —— 首次加载骨架 —— */
+/* —— 加载骨架 —— */
 .skeleton-card {
-  flex: 0 0 var(--card-w);
-  scroll-snap-align: center;
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: var(--card-w);
   padding: 18px 16px;
   background-color: var(--photo);
   border: var(--border);
   border-radius: var(--r-md);
+  transform: translate(-50%, -50%);
 }
 
 .sk-line {
@@ -310,13 +341,18 @@ onMounted(async () => {
 
 /* —— 空状态 —— */
 .feed-empty {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: var(--card-w);
   display: flex;
   flex-direction: column;
   align-items: center;
   gap: 14px;
-  padding: 46px 20px;
+  padding: 40px 16px;
   border: var(--border-dashed);
   border-radius: var(--r-sm);
+  transform: translate(-50%, -50%);
 }
 
 .empty-icon {
@@ -325,8 +361,9 @@ onMounted(async () => {
 
 .empty-text {
   font-family: var(--font-hand);
-  font-size: var(--fs-lg);
+  font-size: var(--fs-md);
   letter-spacing: 1px;
   color: var(--faint);
+  text-align: center;
 }
 </style>

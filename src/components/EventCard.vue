@@ -1,5 +1,10 @@
 <template>
-  <article class="feed-card" :class="`d${Math.min(distance, 2)}`">
+  <article
+    class="feed-card"
+    :class="{ current }"
+    :style="pose"
+    @click="$emit('pick')"
+  >
     <!-- 抬头：类型图标 · 称呼 动作 · 时间 -->
     <div class="card-head">
       <component :is="icon" :size="16" :stroke-width="1.6" class="head-icon" />
@@ -30,7 +35,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, onMounted, onUnmounted, ref } from 'vue'
+import { computed, onMounted, onUnmounted, ref, type CSSProperties } from 'vue'
 import { PenLine, BookOpen, Images as ImagesIcon, Ticket, CupSoda, Sparkles } from 'lucide-vue-next'
 import type { CoupleEvent, Profile } from '../types/domain'
 import { actorLabel, ACTION_LABELS, timeLabel } from '../lib/eventLabels'
@@ -38,9 +43,13 @@ import { actorLabel, ACTION_LABELS, timeLabel } from '../lib/eventLabels'
 const props = defineProps<{
   event: CoupleEvent
   me: Profile
-  /** 离居中卡片的距离：0 居中、1 相邻、2 更远 */
-  distance: number
+  /** 是否为最上层的当前卡片 */
+  current: boolean
+  /** 由父组件按层叠关系算好的定位样式 */
+  pose: CSSProperties
 }>()
+
+defineEmits<{ pick: [] }>()
 
 const ICONS = {
   note: PenLine,
@@ -73,39 +82,28 @@ const time = computed(() => {
 
 <style scoped>
 .feed-card {
-  flex: 0 0 var(--card-w);
-  scroll-snap-align: center;
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: var(--card-w);
+  margin: 0;
   display: flex;
   flex-direction: column;
   background-color: var(--photo);
   border: var(--border);
   border-radius: var(--r-md);
   overflow: hidden;
-  transition: transform 0.32s ease, opacity 0.32s ease, box-shadow 0.32s ease;
-}
-
-/* 居中主卡片：放大、全实、悬浮阴影 */
-.feed-card.d0 {
-  transform: scale(1);
-  opacity: 1;
-  box-shadow: var(--shadow-float);
-  z-index: 3;
-}
-
-/* 相邻卡片：缩小、半透 */
-.feed-card.d1 {
-  transform: scale(0.9);
-  opacity: 0.55;
   box-shadow: var(--shadow-card);
-  z-index: 2;
+  transform-origin: center center;
+  transition: transform 0.45s cubic-bezier(0.22, 0.78, 0.26, 1),
+    opacity 0.35s ease;
+  will-change: transform, opacity;
+  cursor: pointer;
 }
 
-/* 更远的卡片：更小、更淡 */
-.feed-card.d2 {
-  transform: scale(0.84);
-  opacity: 0.3;
-  box-shadow: none;
-  z-index: 1;
+/* 最上层当前卡片：更强的悬浮阴影 */
+.feed-card.current {
+  box-shadow: var(--shadow-float);
 }
 
 .card-head {
