@@ -89,7 +89,8 @@ const time = computed(() => {
   margin: 0;
   display: flex;
   flex-direction: column;
-  background-color: var(--photo);
+  /* 玻璃相纸：半透明暖白，能透出下面堆叠的卡片，同时保留暖调纸感 */
+  background-color: rgba(253, 250, 241, 0.5);
   border: var(--border);
   border-radius: var(--r-md);
   overflow: hidden;
@@ -101,9 +102,12 @@ const time = computed(() => {
   cursor: pointer;
 }
 
-/* 最上层当前卡片：更强的悬浮阴影 */
+/* 最上层当前卡片：更实、更强阴影、毛玻璃，透过它能看到下面堆叠内容 */
 .feed-card.current {
+  background-color: rgba(253, 250, 241, 0.66);
   box-shadow: var(--shadow-float);
+  backdrop-filter: blur(10px) saturate(1.12);
+  -webkit-backdrop-filter: blur(10px) saturate(1.12);
 }
 
 .card-head {

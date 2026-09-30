@@ -208,7 +208,11 @@ onUnmounted(() => window.removeEventListener('resize', measure))
 
 <style scoped>
 .home-page {
-  padding: calc(16px + env(safe-area-inset-top)) 20px 24px;
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  overflow: hidden; /* 首页固定一屏，不上下滚动 */
+  padding: calc(12px + env(safe-area-inset-top)) 20px 0;
 }
 
 /* —— 天数邮票卡片 —— */
@@ -329,10 +333,12 @@ onUnmounted(() => window.removeEventListener('resize', measure))
 /* —— 堆叠卡片容器 —— */
 .deck {
   position: relative;
-  height: 392px;
+  flex: 1 1 auto;
+  min-height: 0;
   margin: 0 -20px;
-  /* 纵向交给浏览器滚动页面，横向手势交给 JS 跟手拖动 */
+  /* 首页固定不纵向滚，横向手势交给 JS 跟手拖动 */
   touch-action: pan-y;
+  overflow: hidden;
 }
 
 /* —— 加载骨架 —— */

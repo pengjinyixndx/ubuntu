@@ -27,6 +27,7 @@ body {
   color: var(--ink);
   /* 宽屏下两侧用更深的纸色，衬托中间手机列 */
   background-color: var(--paper-deep);
+  overscroll-behavior: none; /* 禁止下拉刷新/橡皮筋回弹，贴近 app 手感 */
   -webkit-font-smoothing: antialiased;
   text-rendering: optimizeLegibility;
 }

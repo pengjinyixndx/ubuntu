@@ -51,9 +51,10 @@ const switchTab = (path: string) => {
   display: flex;
   flex-direction: column;
   height: 100vh;
-  max-width: 480px;
+  max-width: var(--app-w);
   margin: 0 auto;
   position: relative;
+  overflow: hidden; /* 外层固定，绝不随 body 滚动，像 app 一样 */
   background-color: var(--paper);
   border-left: 1px solid var(--line-strong);
   border-right: 1px solid var(--line-strong);
@@ -64,23 +65,22 @@ const switchTab = (path: string) => {
   }
 }
 
-/* —— 内容区 —— */
+/* —— 内容区：内部独立滚动，外层不滚 —— */
 .content {
-  flex: 1;
+  flex: 1 1 auto;
+  min-height: 0; /* 允许收缩，overflow 才能真正生效 */
   overflow-y: auto;
+  overscroll-behavior: contain; /* 滚到边缘不把滚动传给外层 */
   -webkit-overflow-scrolling: touch;
-  padding-bottom: calc(var(--tabbar-h) + env(safe-area-inset-bottom));
 }
 
-/* —— 底部导航 —— */
+/* —— 底部导航：作为 flex 底部项固定，不被内容遮挡、点击稳定 —— */
 .tab-bar {
-  position: fixed;
-  bottom: 0;
-  left: 50%;
-  transform: translateX(-50%);
+  position: relative;
+  z-index: 10;
+  flex: 0 0 auto;
   width: 100%;
-  max-width: 480px;
-  height: var(--tabbar-h);
+  height: calc(var(--tabbar-h) + env(safe-area-inset-bottom));
   display: flex;
   background-color: var(--paper);
   border-top: var(--border-strong);
