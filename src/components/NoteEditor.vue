@@ -13,21 +13,24 @@
         </button>
       </header>
 
-      <!-- 信纸 -->
-      <div class="paper">
-        <!-- 信头：日期 + 写给谁 -->
-        <div class="letterhead">
-          <span class="letter-date">{{ todayLabel }}</span>
-          <span class="letter-to">写给 {{ partner }}</span>
-        </div>
-        <div class="letter-rule"></div>
+      <!-- 信纸（桌面上的主体） -->
+      <div class="paper-wrap">
+        <div class="letter-card">
+          <!-- 信头：日期 + 写给谁 -->
+          <div class="letterhead">
+            <span class="letter-date">{{ todayLabel }}</span>
+            <span class="letter-to">写给 {{ partner }}</span>
+          </div>
+          <div class="greeting">见字如面：</div>
+          <div class="letter-rule"></div>
 
-        <textarea
-          ref="taRef"
-          v-model="text"
-          class="writing"
-          :placeholder="placeholder"
-        ></textarea>
+          <textarea
+            ref="taRef"
+            v-model="text"
+            class="writing"
+            :placeholder="placeholder"
+          ></textarea>
+        </div>
       </div>
 
       <!-- 底部提示 -->
@@ -36,7 +39,7 @@
         <span v-else class="foot-count">{{ text.length }} 字</span>
       </footer>
 
-      <!-- 边缘装饰：爬行的小螃蟹 + 银杏叶 -->
+      <!-- 桌面边缘：爬行的小螃蟹 + 银杏叶 -->
       <div class="edge-decor" aria-hidden="true">
         <div class="crawler"><Critter kind="crab" :size="40" /></div>
         <Critter class="ginkgo g1" kind="ginkgo" :size="34" />
@@ -121,7 +124,7 @@ onMounted(() => {
   width: 100%;
   max-width: var(--app-w);
   margin: 0 auto;
-  background-color: var(--photo);
+  background-color: var(--paper);
   border-left: 1px solid var(--line-strong);
   border-right: 1px solid var(--line-strong);
   padding-top: env(safe-area-inset-top);
@@ -190,20 +193,31 @@ onMounted(() => {
   }
 }
 
-/* —— 信纸 —— */
-.paper {
+/* —— 信纸（主体）—— */
+.paper-wrap {
+  flex: 1;
+  display: flex;
+  min-height: 0;
+  padding: 12px 14px calc(50px + env(safe-area-inset-bottom));
+}
+
+.letter-card {
   flex: 1;
   display: flex;
   flex-direction: column;
   min-height: 0;
-  padding: 0 22px;
+  background-color: var(--photo);
+  border: var(--border);
+  border-radius: var(--r-sm);
+  box-shadow: var(--shadow-card);
+  overflow: hidden;
 }
 
 .letterhead {
   display: flex;
   align-items: baseline;
   justify-content: space-between;
-  padding-top: 18px;
+  padding: 16px 18px 0;
 }
 
 .letter-date {
@@ -220,8 +234,15 @@ onMounted(() => {
   color: var(--muted);
 }
 
+.greeting {
+  padding: 8px 18px 0;
+  font-family: var(--font-hand);
+  font-size: var(--fs-md);
+  color: var(--ink-soft);
+}
+
 .letter-rule {
-  margin: 12px 0 4px;
+  margin: 12px 18px 4px;
   border-top: var(--border-dashed);
 }
 
@@ -229,6 +250,8 @@ onMounted(() => {
   flex: 1;
   width: 100%;
   min-height: 0;
+  margin: 0;
+  padding: 0 18px 12px;
   resize: none;
   border: none;
   outline: none;
@@ -243,7 +266,6 @@ onMounted(() => {
   font-family: var(--font-song);
   font-size: var(--fs-lg);
   line-height: 30px;
-  padding-top: 3px;
   color: var(--ink);
 }
 
@@ -271,7 +293,7 @@ onMounted(() => {
   color: var(--faint);
 }
 
-/* —— 边缘小生物 —— */
+/* —— 桌面边缘小生物 —— */
 .edge-decor {
   position: absolute;
   inset: 0;
@@ -293,12 +315,12 @@ onMounted(() => {
   color: var(--caramel);
 }
 .ginkgo.g1 {
-  top: 64px;
+  top: 66px;
   right: 10px;
   opacity: 0.55;
 }
 .ginkgo.g2 {
-  top: 112px;
+  top: 116px;
   right: 44px;
   opacity: 0.32;
 }
