@@ -22,15 +22,24 @@
         <span class="tab-text">{{ tab.name }}</span>
       </div>
     </nav>
+
+    <!-- 吵架期间：每次打开都会弹出两份矛盾记录 -->
+    <ConflictPopup v-if="showConflict" @done="showConflict = false" />
   </div>
 </template>
 
 <script setup lang="ts">
+import { onMounted, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { Home, PenLine, HeartHandshake, User } from 'lucide-vue-next'
+import { usePetition } from '../composables/usePetition'
+import ConflictPopup from '../components/ConflictPopup.vue'
 
 const route = useRoute()
 const router = useRouter()
+
+const { needConflictPopup, loadPetition } = usePetition()
+const showConflict = ref(false)
 
 const tabs = [
   { name: '首页', path: '/home', icon: Home },
@@ -44,6 +53,12 @@ const switchTab = (path: string) => {
     router.push(path)
   }
 }
+
+onMounted(async () => {
+  // 每次打开青桃都自查一次：还在吵架期间就弹出来
+  await loadPetition()
+  if (needConflictPopup.value) showConflict.value = true
+})
 </script>
 
 <style scoped>

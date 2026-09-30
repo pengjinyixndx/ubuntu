@@ -7,6 +7,7 @@
       <div class="id-info">
         <div class="nickname">{{ displayName }}</div>
         <div class="sub">在一起的第 {{ days }} 天</div>
+        <p v-if="kissDebt > 0" class="debt">还欠着 {{ kissDebt }} 个亲亲</p>
       </div>
       <div class="stamp">
         <span class="stamp-num">{{ days }}</span>
@@ -78,11 +79,15 @@
       </div>
 
       <ul v-else-if="wishes.length" class="wish-list">
-        <li v-for="w in wishes" :key="w.id" class="wish-item">
-          <span class="wish-check"></span>
+        <li v-for="w in wishes" :key="w.id" class="wish-item" :class="{ done: w.done }">
+          <span class="wish-check" :class="{ on: w.done }">
+            <Check v-if="w.done" :size="12" :stroke-width="2.6" />
+          </span>
           <div class="wish-body">
             <p class="wish-text">{{ w.content }}</p>
-            <p v-if="w.wantAt" class="wish-date">想在 {{ w.wantAt }} 完成</p>
+            <p class="wish-date">
+              {{ w.done ? '已经做到啦' : w.wantAt ? `想在 ${w.wantAt} 完成` : '没定时间' }}
+            </p>
           </div>
         </li>
       </ul>
@@ -112,14 +117,16 @@
 import { computed, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { supabase } from '../lib/supabase'
-import { Settings, LogOut, ChevronRight, Images, Sparkles } from 'lucide-vue-next'
+import { Settings, LogOut, ChevronRight, Images, Sparkles, Check } from 'lucide-vue-next'
 import { getTogetherDays } from '../composables/useTogether'
 import { useFeed } from '../composables/useFeed'
+import { usePetition } from '../composables/usePetition'
 import { USE_MOCK } from '../lib/dataSource'
 import MilkteaCard from '../components/MilkteaCard.vue'
 
 const router = useRouter()
 const { events, myProfile, loading, loadEvents } = useFeed()
+const { wishList, kissDebt, loadPetition } = usePetition()
 
 const days = getTogetherDays()
 const displayName = computed(() => myProfile.value?.display_name || '我的账号')
@@ -136,6 +143,7 @@ interface WishItem {
   id: string
   content: string
   wantAt: string
+  done: boolean
 }
 
 const photos = computed<PhotoItem[]>(() => {
@@ -149,14 +157,14 @@ const photos = computed<PhotoItem[]>(() => {
   return items
 })
 
+// 心愿单以请愿页维护的那份为准（可以标记完成）
 const wishes = computed<WishItem[]>(() =>
-  events.value
-    .filter((e) => e.type === 'wish')
-    .map((e) => ({
-      id: e.id,
-      content: e.content || '',
-      wantAt: formatWantAt((e.meta?.want_at as string) || '')
-    }))
+  wishList.value.map((w) => ({
+    id: w.id,
+    content: w.content,
+    wantAt: formatWantAt(w.want_at || ''),
+    done: w.done
+  }))
 )
 
 const photoCount = computed(() => photos.value.length)
@@ -204,6 +212,7 @@ const handleLogout = async () => {
 onMounted(() => {
   // 直入本页（例如刷新在 /profile）时，也保证有数据可展示
   if (!events.value.length) loadEvents()
+  if (!wishList.value.length) loadPetition()
 })
 </script>
 
@@ -279,6 +288,15 @@ onMounted(() => {
   font-family: var(--font-hand);
   font-size: var(--fs-sm);
   color: var(--muted);
+}
+
+/* 欠亲亲：名字下面那一行小字 */
+.debt {
+  margin: 5px 0 0;
+  font-family: var(--font-hand);
+  font-size: var(--fs-sm);
+  letter-spacing: 1px;
+  color: var(--brick);
 }
 
 /* 天数印章：暗砖红，斜斜盖上去 */
@@ -471,9 +489,24 @@ onMounted(() => {
   width: 20px;
   height: 20px;
   margin-top: 3px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
   border: 1.5px solid var(--line-strong);
   border-radius: var(--r-sm);
   background-color: var(--paper);
+  color: var(--photo);
+}
+.wish-check.on {
+  background-color: var(--caramel);
+  border-color: var(--caramel);
+}
+.wish-item.done .wish-text {
+  color: var(--faint);
+  text-decoration: line-through;
+}
+.wish-item.done .wish-date {
+  color: var(--faint);
 }
 .wish-body {
   flex: 1;
