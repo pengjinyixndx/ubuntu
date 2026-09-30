@@ -11,6 +11,7 @@ import type {
   ConflictNote,
   ConflictStatus,
   CoupleEvent,
+  Gender,
   Kiss,
   MilkteaRequest,
   Profile,
@@ -120,6 +121,9 @@ const wishes: Wish[] = [
 const conflicts: Conflict[] = []
 const conflictNotes: ConflictNote[] = []
 
+/** 本地演示里「我」的档案也是可改的（设置页改性别/昵称） */
+const myProfile: Profile = { ...MOCK_ME }
+
 /* —— 刷新后仍在：把请愿数据存到 localStorage —— */
 function persist() {
   if (typeof localStorage === 'undefined') return
@@ -158,7 +162,7 @@ restore()
 
 export const mockSource: FeedSource = {
   async getMe(): Promise<Profile | null> {
-    return MOCK_ME
+    return myProfile
   },
 
   async getPartner(): Promise<Profile | null> {
@@ -335,6 +339,13 @@ export const mockSource: FeedSource = {
       cf.updated_at = new Date().toISOString()
       persist()
     }
+    return { error: null }
+  },
+
+  /* —— 设置 —— */
+  async updateProfile(input: { gender?: Gender; display_name?: string }) {
+    if (input.gender !== undefined) myProfile.gender = input.gender
+    if (input.display_name !== undefined) myProfile.display_name = input.display_name
     return { error: null }
   }
 }

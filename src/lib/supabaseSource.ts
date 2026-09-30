@@ -8,6 +8,7 @@ import type {
   ConflictNote,
   ConflictStatus,
   CoupleEvent,
+  Gender,
   Kiss,
   MilkteaRequest,
   Profile,
@@ -260,6 +261,20 @@ export const supabaseSource: FeedSource = {
       .update({ status, updated_at: new Date().toISOString() })
       .eq('id', id)
     if (error) fail('更新矛盾状态失败', error)
+    return { error }
+  },
+
+  /* —— 设置 —— */
+  async updateProfile(input): Promise<{ error: unknown }> {
+    const uid = await myId()
+    if (!uid) return { error: '未登录' }
+
+    const patch: Record<string, unknown> = {}
+    if (input.gender !== undefined) patch.gender = input.gender
+    if (input.display_name !== undefined) patch.display_name = input.display_name
+
+    const { error } = await supabase.from('profiles').update(patch).eq('id', uid)
+    if (error) fail('保存档案失败', error)
     return { error }
   }
 }
