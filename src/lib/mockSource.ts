@@ -6,7 +6,7 @@
    ============================================================ */
 
 import type { CoupleEvent } from '../types/domain'
-import type { FeedSource, LoadResult, PublishInput } from './feedSource'
+import type { FeedSource, LoadResult, PublishInput, UploadResult } from './feedSource'
 import { MOCK_EVENTS, MOCK_ME } from './mockFeed'
 
 // 复制一份，避免直接改动 mockFeed 里的预置数组
@@ -36,5 +36,10 @@ export const mockSource: FeedSource = {
       created_at: new Date().toISOString()
     })
     return { error: null }
+  },
+
+  async uploadPhoto(file: File): Promise<UploadResult> {
+    // 本地演示：不真的上传，直接用内存里的 object URL（刷新即失效）
+    return { url: URL.createObjectURL(file), error: null }
   }
 }

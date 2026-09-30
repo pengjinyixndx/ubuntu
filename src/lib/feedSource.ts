@@ -23,6 +23,13 @@ export interface LoadResult {
   error: unknown
 }
 
+/** 上传图片的结果 */
+export interface UploadResult {
+  /** 可访问的图片地址；失败为 null */
+  url: string | null
+  error: unknown
+}
+
 export interface FeedSource {
   /** 读取当前登录者档案；未登录返回 null */
   getMe(): Promise<Profile | null>
@@ -30,4 +37,6 @@ export interface FeedSource {
   listEvents(limit: number): Promise<LoadResult>
   /** 发布一条动态 */
   addEvent(input: PublishInput): Promise<{ error: unknown }>
+  /** 上传一张图片，返回可访问地址 */
+  uploadPhoto(file: File): Promise<UploadResult>
 }

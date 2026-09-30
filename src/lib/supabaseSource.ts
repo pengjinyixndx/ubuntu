@@ -4,7 +4,10 @@
 
 import { supabase } from './supabase'
 import type { CoupleEvent, Profile } from '../types/domain'
-import type { FeedSource, LoadResult, PublishInput } from './feedSource'
+import type { FeedSource, LoadResult, PublishInput, UploadResult } from './feedSource'
+
+/** 图片存储桶名（需在 Supabase 建好，见 supabase/storage.sql） */
+const BUCKET = 'photos'
 
 export const supabaseSource: FeedSource = {
   async getMe(): Promise<Profile | null> {
@@ -47,5 +50,26 @@ export const supabaseSource: FeedSource = {
 
     if (error) console.error('[青桃] 写入动态失败：', error)
     return { error }
+  },
+
+  async uploadPhoto(file: File): Promise<UploadResult> {
+    const me = await this.getMe()
+    if (!me) return { url: null, error: '未登录' }
+
+    const ext = file.name.split('.').pop()?.toLowerCase() || 'jpg'
+    const path = `${me.id}/${Date.now()}-${Math.random().toString(36).slice(2, 8)}.${ext}`
+
+    const { error } = await supabase.storage.from(BUCKET).upload(path, file, {
+      cacheControl: '3600',
+      upsert: false
+    })
+
+    if (error) {
+      console.error('[青桃] 上传照片失败：', error)
+      return { url: null, error }
+    }
+
+    const { data } = supabase.storage.from(BUCKET).getPublicUrl(path)
+    return { url: data.publicUrl, error: null }
   }
 }

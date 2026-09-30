@@ -12,11 +12,10 @@
           </button>
         </header>
 
-        <!-- 正文（不再截断） -->
+        <!-- 正文 -->
         <div class="detail-body">
-          <p v-if="isText" class="detail-text">{{ event.content }}</p>
-
-          <div v-else-if="event.type === 'photo'" class="detail-photos">
+          <!-- 照片：全部 -->
+          <div v-if="event.type === 'photo'" class="detail-photos">
             <img
               v-for="(url, i) in event.photo_urls"
               :key="i"
@@ -27,13 +26,35 @@
             />
           </div>
 
-          <div v-else class="ticket-big">
+          <!-- 奶茶券 -->
+          <div v-else-if="isTicket" class="ticket-big">
             <component :is="icon" :size="30" :stroke-width="1.4" />
             <p class="ticket-text">{{ event.content || '奶茶券' }}</p>
             <p v-if="metaText" class="ticket-meta">{{ metaText }}</p>
           </div>
 
-          <p v-if="event.type === 'wish' && wantAt" class="wish-when">想在 {{ wantAt }} 完成</p>
+          <!-- 喝奶茶 -->
+          <div v-else-if="event.type === 'milktea'">
+            <div v-if="teaChips.length" class="chips">
+              <span v-for="c in teaChips" :key="c" class="chip">{{ c }}</span>
+            </div>
+            <p v-if="event.content" class="detail-text">{{ event.content }}</p>
+          </div>
+
+          <!-- 随笔 / 日记 / 心愿 -->
+          <template v-else>
+            <div v-if="diaryChips.length" class="chips">
+              <span v-for="c in diaryChips" :key="c" class="chip">{{ c }}</span>
+            </div>
+            <p v-if="event.content" class="detail-text">{{ event.content }}</p>
+            <div v-if="singlePhoto" class="note-photo">
+              <img :src="singlePhoto" alt="随手拍" @error="onImgError" />
+            </div>
+            <p v-if="event.type === 'wish' && wantAt" class="wish-when">想在 {{ wantAt }} 完成</p>
+          </template>
+
+          <!-- 照片的说明 -->
+          <p v-if="event.type === 'photo' && event.content" class="photo-cap">{{ event.content }}</p>
         </div>
       </article>
     </div>
@@ -53,6 +74,7 @@ import {
 } from 'lucide-vue-next'
 import type { CoupleEvent, Profile } from '../types/domain'
 import { actorLabel, ACTION_LABELS, dateTimeLabel } from '../lib/eventLabels'
+import { WEATHERS, MOODS, labelOfKey } from '../lib/options'
 
 const props = defineProps<{
   event: CoupleEvent
@@ -65,6 +87,7 @@ const ICONS = {
   note: PenLine,
   diary: BookOpen,
   photo: ImagesIcon,
+  milktea: CupSoda,
   milktea_issue: Ticket,
   milktea_redeem: CupSoda,
   wish: Sparkles
@@ -73,10 +96,31 @@ const ICONS = {
 const icon = computed(() => ICONS[props.event.type])
 const actor = computed(() => actorLabel(props.event.actor_id, props.me.id, props.me.gender))
 const action = computed(() => ACTION_LABELS[props.event.type])
-const isText = computed(() => ['note', 'diary', 'wish'].includes(props.event.type))
 const dateTime = computed(() => dateTimeLabel(props.event.created_at))
+const isTicket = computed(
+  () => props.event.type === 'milktea_issue' || props.event.type === 'milktea_redeem'
+)
 
-// 奶茶券的附加说明（如颁发理由）
+const singlePhoto = computed(() =>
+  props.event.type === 'note' ? (props.event.photo_urls?.[0] ?? '') : ''
+)
+
+const diaryChips = computed(() => {
+  if (props.event.type !== 'diary') return []
+  return [
+    labelOfKey(WEATHERS, props.event.meta?.weather),
+    labelOfKey(MOODS, props.event.meta?.mood)
+  ].filter(Boolean)
+})
+
+const teaChips = computed(() => {
+  if (props.event.type !== 'milktea') return []
+  return [props.event.meta?.flavor, props.event.meta?.sweetness].filter(
+    (x): x is string => typeof x === 'string' && !!x
+  )
+})
+
+// 奶茶券的附加说明
 const metaText = computed(() => {
   const reason = props.event.meta?.reason
   return typeof reason === 'string' && reason ? reason : ''
@@ -135,19 +179,16 @@ function onImgError(e: Event) {
   padding: 13px 14px;
   border-bottom: var(--border-dashed);
 }
-
 .head-icon {
   color: var(--caramel);
   flex-shrink: 0;
 }
-
 .head-actor {
   font-family: var(--font-song);
   font-size: var(--fs-sm);
   color: var(--ink);
   white-space: nowrap;
 }
-
 .head-time {
   margin-left: auto;
   font-family: var(--font-typewriter);
@@ -155,7 +196,6 @@ function onImgError(e: Event) {
   color: var(--muted);
   white-space: nowrap;
 }
-
 .close-btn {
   flex-shrink: 0;
   display: flex;
@@ -185,17 +225,50 @@ function onImgError(e: Event) {
   word-break: break-word;
 }
 
+.chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 7px;
+  margin-bottom: 12px;
+}
+.chip {
+  padding: 4px 11px;
+  font-family: var(--font-song);
+  font-size: var(--fs-sm);
+  color: var(--caramel);
+  border: 1px solid var(--line);
+  border-radius: 999px;
+}
+
 .detail-photos {
   display: flex;
   flex-direction: column;
   gap: 12px;
 }
-
 .detail-photos img {
   width: 100%;
   border: var(--border);
   border-radius: var(--r-sm);
   background-color: var(--paper-deep);
+}
+
+.note-photo {
+  margin-top: 14px;
+  border: var(--border);
+  border-radius: var(--r-sm);
+  overflow: hidden;
+  background-color: var(--paper-deep);
+}
+.note-photo img {
+  width: 100%;
+}
+
+.photo-cap {
+  margin: 12px 0 0;
+  font-family: var(--font-hand);
+  font-size: var(--fs-md);
+  color: var(--ink-soft);
+  text-align: center;
 }
 
 .ticket-big {
@@ -209,14 +282,12 @@ function onImgError(e: Event) {
   border-radius: var(--r-sm);
   text-align: center;
 }
-
 .ticket-text {
   margin: 0;
   font-family: var(--font-song);
   font-size: var(--fs-md);
   color: var(--ink);
 }
-
 .ticket-meta {
   margin: 0;
   font-family: var(--font-hand);

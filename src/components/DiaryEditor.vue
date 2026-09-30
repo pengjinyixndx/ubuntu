@@ -1,42 +1,57 @@
 <template>
   <Teleport to="body">
     <div class="overlay">
-      <!-- 顶部栏 -->
       <header class="editor-bar">
         <button type="button" class="icon-btn" @click="emit('close')" aria-label="关闭">
           <X :size="22" :stroke-width="1.6" />
         </button>
-        <span class="editor-title">写随笔</span>
+        <span class="editor-title">写日记</span>
         <button type="button" class="stamp-btn" :disabled="!canSave" @click="save">
           <Loader v-if="saving" :size="14" class="spin" />
-          <span v-else>寄出</span>
+          <span v-else>写完了</span>
         </button>
       </header>
 
-      <!-- 明信片 -->
+      <!-- 日记本页 -->
       <div class="paper-wrap">
-        <div class="postcard">
-          <span class="tape"></span>
+        <div class="notebook">
+          <div class="nb-head">
+            <span class="nb-date">{{ todayLabel }}</span>
+            <span class="nb-to">写给 {{ partner }}</span>
+          </div>
 
-          <!-- 一张随手拍（可不加） -->
-          <div class="photo-slot">
-            <button v-if="!photoUrl" type="button" class="photo-empty" @click="picker?.open()">
-              <Plus :size="18" :stroke-width="1.8" />
-              <span>随手拍一张（可不加）</span>
+          <!-- 天气 / 心情（可都不选） -->
+          <div class="picks">
+            <button
+              v-for="w in WEATHERS"
+              :key="w.key"
+              type="button"
+              class="pick"
+              :class="{ on: weather === w.key }"
+              @click="weather = weather === w.key ? '' : w.key"
+            >
+              <component :is="w.icon" :size="15" :stroke-width="1.7" />
+              {{ w.label }}
             </button>
-            <div v-else class="photo-have">
-              <img :src="photoUrl" alt="随手拍" />
-              <button type="button" class="photo-del" aria-label="删掉照片" @click="clearPhoto">
-                <X :size="13" :stroke-width="2" />
-              </button>
-            </div>
+            <span class="pick-gap"></span>
+            <button
+              v-for="m in MOODS"
+              :key="m.key"
+              type="button"
+              class="pick"
+              :class="{ on: mood === m.key }"
+              @click="mood = mood === m.key ? '' : m.key"
+            >
+              <component :is="m.icon" :size="15" :stroke-width="1.7" />
+              {{ m.label }}
+            </button>
           </div>
 
           <textarea
             ref="taRef"
             v-model="text"
             class="writing"
-            :placeholder="placeholder"
+            placeholder="今天发生了什么呢……"
           ></textarea>
         </div>
       </div>
@@ -46,89 +61,77 @@
         <span v-else class="foot-count">{{ text.length }} 字</span>
       </footer>
 
-      <!-- 桌面边缘小生物 -->
       <div class="edge-decor" aria-hidden="true">
         <div class="crawler"><Critter kind="crab" :size="40" /></div>
         <Critter class="ginkgo g1" kind="ginkgo" :size="34" />
         <Critter class="ginkgo g2" kind="ginkgo" :size="24" />
       </div>
 
-      <PhotoPicker ref="picker" @picked="onPicked" />
-      <PublishFlash v-if="flash" type="note" @done="emit('close')" />
+      <PublishFlash v-if="flash" type="diary" @done="emit('close')" />
     </div>
   </Teleport>
 </template>
 
 <script setup lang="ts">
 import { computed, onMounted, ref } from 'vue'
-import { X, Loader, Plus } from 'lucide-vue-next'
+import { X, Loader } from 'lucide-vue-next'
 import { useFeed } from '../composables/useFeed'
+import { WEATHERS, MOODS } from '../lib/options'
 import Critter from './Critter.vue'
-import PhotoPicker from './PhotoPicker.vue'
 import PublishFlash from './PublishFlash.vue'
 
 const emit = defineEmits<{ close: [] }>()
-const { publishEvent, uploadPhoto, myProfile, ensureMe } = useFeed()
+const { publishEvent, myProfile, ensureMe } = useFeed()
 
 const text = ref('')
 const saving = ref(false)
 const errMsg = ref('')
 const flash = ref(false)
 const taRef = ref<HTMLTextAreaElement | null>(null)
-const picker = ref<InstanceType<typeof PhotoPicker> | null>(null)
+const weather = ref('')
+const mood = ref('')
 
-// 一张随手拍（可选）
-const photo = ref<File | null>(null)
-const photoUrl = ref('')
-
-const canSave = computed(() => (text.value.trim().length > 0 || !!photo.value) && !saving.value)
+const canSave = computed(() => text.value.trim().length > 0 && !saving.value)
 const partner = computed(() => (myProfile.value?.gender === 'female' ? '他' : '她'))
-const placeholder = computed(() => `写${partner.value}的话，随手记两句……`)
 
-function onPicked(files: File[]) {
-  const f = files[0]
-  if (!f) return
-  if (photoUrl.value) URL.revokeObjectURL(photoUrl.value)
-  photo.value = f
-  photoUrl.value = URL.createObjectURL(f)
+// 日期：二〇二六年九月三十日
+const CN = ['〇', '一', '二', '三', '四', '五', '六', '七', '八', '九']
+function cnNum(n: number): string {
+  const tens = Math.floor(n / 10)
+  const ones = n % 10
+  let s = ''
+  if (tens === 1) s = '十'
+  else if (tens >= 2) s = CN[tens]! + '十'
+  if (ones > 0) s += CN[ones]
+  return s
 }
-
-function clearPhoto() {
-  if (photoUrl.value) URL.revokeObjectURL(photoUrl.value)
-  photo.value = null
-  photoUrl.value = ''
-}
+const todayLabel = computed(() => {
+  const d = new Date()
+  const y = String(d.getFullYear())
+    .split('')
+    .map((c) => CN[Number(c)])
+    .join('')
+  return `${y}年${cnNum(d.getMonth() + 1)}月${cnNum(d.getDate())}日`
+})
 
 async function save() {
   if (!canSave.value) return
   saving.value = true
   errMsg.value = ''
 
-  let urls: string[] | undefined
-  if (photo.value) {
-    const { url, error } = await uploadPhoto(photo.value)
-    if (error || !url) {
-      saving.value = false
-      errMsg.value = '照片没传上去，再试一次'
-      return
-    }
-    urls = [url]
-  }
-
   const { error } = await publishEvent({
-    type: 'note',
+    type: 'diary',
     content: text.value.trim(),
-    photo_urls: urls
+    meta: { weather: weather.value || null, mood: mood.value || null }
   })
   saving.value = false
 
   if (error) {
-    errMsg.value = '没寄出去，再试一次'
+    errMsg.value = '没收录进去，再试一次'
     return
   }
   text.value = ''
-  clearPhoto()
-  flash.value = true // 播完动画再关闭
+  flash.value = true
 }
 
 onMounted(() => {
@@ -160,7 +163,6 @@ onMounted(() => {
   padding: 10px 14px;
   border-bottom: var(--border-dashed);
 }
-
 .icon-btn {
   display: flex;
   align-items: center;
@@ -172,24 +174,21 @@ onMounted(() => {
   border: none;
   cursor: pointer;
 }
-
 .editor-title {
   font-family: var(--font-hand);
   font-size: var(--fs-lg);
   color: var(--ink);
   letter-spacing: 2px;
 }
-
 .stamp-btn {
   display: flex;
   align-items: center;
   justify-content: center;
-  min-width: 64px;
+  min-width: 74px;
   padding: 8px 14px;
   font-family: var(--font-song);
   font-size: var(--fs-sm);
-  letter-spacing: 3px;
-  text-indent: 3px;
+  letter-spacing: 2px;
   color: var(--photo);
   background-color: var(--brick);
   border: none;
@@ -203,7 +202,6 @@ onMounted(() => {
   box-shadow: none;
   cursor: not-allowed;
 }
-
 .spin {
   animation: spin 1s linear infinite;
 }
@@ -213,97 +211,86 @@ onMounted(() => {
   }
 }
 
-/* —— 明信片 —— */
+/* —— 日记本页 —— */
 .paper-wrap {
   flex: 1;
   display: flex;
   min-height: 0;
-  padding: 16px 14px calc(50px + env(safe-area-inset-bottom));
+  padding: 14px 14px calc(50px + env(safe-area-inset-bottom));
 }
 
-.postcard {
+.notebook {
   position: relative;
   flex: 1;
   display: flex;
   flex-direction: column;
   min-height: 0;
-  padding: 16px 16px 14px;
+  padding: 16px 16px 14px 16px;
   background-color: var(--photo);
   border: var(--border);
   border-radius: var(--r-sm);
   box-shadow: var(--shadow-card);
-  transform: rotate(-0.8deg);
+  overflow: hidden;
 }
 
-.tape {
+/* 装订线 */
+.notebook::before {
+  content: '';
   position: absolute;
-  top: -10px;
-  left: 50%;
-  width: 54px;
-  height: 18px;
-  transform: translateX(-50%) rotate(-3deg);
-  background-color: var(--tape);
-  background-image: repeating-linear-gradient(
-    90deg,
-    transparent 0,
-    transparent 6px,
-    rgba(255, 255, 255, 0.35) 6px,
-    rgba(255, 255, 255, 0.35) 12px
-  );
+  top: 0;
+  bottom: 0;
+  left: 34px;
+  border-left: 1px solid rgba(173, 79, 56, 0.16);
+  pointer-events: none;
 }
 
-/* —— 随手拍一张 —— */
-.photo-slot {
-  flex-shrink: 0;
-  margin-bottom: 12px;
-}
-
-.photo-empty {
+.nb-head {
   display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 7px;
-  width: 100%;
-  height: 84px;
-  color: var(--faint);
-  background-color: transparent;
-  border: 1.5px dashed var(--line-strong);
-  border-radius: var(--r-sm);
+  align-items: baseline;
+  justify-content: space-between;
+  padding-left: 26px;
+}
+.nb-date {
+  font-family: var(--font-hand);
+  font-size: var(--fs-md);
+  letter-spacing: 1px;
+  color: var(--ink);
+}
+.nb-to {
   font-family: var(--font-song);
   font-size: var(--fs-sm);
-  letter-spacing: 1px;
-  cursor: pointer;
+  color: var(--muted);
 }
 
-.photo-have {
-  position: relative;
-  height: 168px;
-  border: var(--border);
-  border-radius: var(--r-sm);
-  overflow: hidden;
-  background-color: var(--paper-deep);
+/* —— 天气 / 心情 —— */
+.picks {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  margin: 12px 0 10px;
+  padding-left: 26px;
 }
-
-.photo-have img {
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
-}
-
-.photo-del {
-  position: absolute;
-  top: 6px;
-  right: 6px;
+.pick {
   display: flex;
   align-items: center;
-  justify-content: center;
-  width: 26px;
-  height: 26px;
-  color: var(--photo);
-  background-color: rgba(43, 37, 29, 0.55);
-  border: none;
-  border-radius: 50%;
+  gap: 4px;
+  padding: 5px 9px;
+  font-family: var(--font-song);
+  font-size: var(--fs-xs);
+  color: var(--muted);
+  background-color: transparent;
+  border: var(--border);
+  border-radius: 999px;
   cursor: pointer;
+}
+.pick.on {
+  color: var(--photo);
+  background-color: var(--caramel);
+  border-color: var(--caramel);
+}
+.pick-gap {
+  width: 8px;
 }
 
 /* —— 正文 —— */
@@ -315,12 +302,19 @@ onMounted(() => {
   border: none;
   outline: none;
   background-color: transparent;
+  background-image: linear-gradient(
+    to bottom,
+    transparent 0,
+    transparent 29px,
+    var(--line) 29px,
+    var(--line) 30px
+  );
   font-family: var(--font-song);
   font-size: var(--fs-lg);
-  line-height: 1.9;
+  line-height: 30px;
+  padding-left: 26px;
   color: var(--ink);
 }
-
 .writing::placeholder {
   color: var(--faint);
 }

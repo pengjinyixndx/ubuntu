@@ -10,6 +10,7 @@ export type EventType =
   | 'note' // 随笔
   | 'diary' // 日记
   | 'photo' // 照片
+  | 'milktea' // 喝奶茶（随手记一杯）
   | 'milktea_issue' // 颁发奶茶券
   | 'milktea_redeem' // 核销奶茶券
   | 'wish' // 添加心愿

@@ -22,7 +22,10 @@
       </button>
     </div>
 
-    <NoteEditor v-if="showNote" @close="showNote = false" />
+    <NoteEditor v-if="active === 'note'" @close="close" />
+    <DiaryEditor v-if="active === 'diary'" @close="close" />
+    <PhotoEditor v-if="active === 'photo'" @close="close" />
+    <MilkteaEditor v-if="active === 'milktea'" @close="close" />
   </div>
 </template>
 
@@ -30,8 +33,11 @@
 import { ref } from 'vue'
 import { PenLine, BookOpen, Images, CupSoda, ChevronRight } from 'lucide-vue-next'
 import NoteEditor from '../components/NoteEditor.vue'
+import DiaryEditor from '../components/DiaryEditor.vue'
+import PhotoEditor from '../components/PhotoEditor.vue'
+import MilkteaEditor from '../components/MilkteaEditor.vue'
 
-const showNote = ref(false)
+const active = ref('')
 
 const entries = [
   { key: 'note', name: '随笔', desc: '三两句心情，随手记下', icon: PenLine },
@@ -41,7 +47,11 @@ const entries = [
 ]
 
 function openEntry(item: { key: string }) {
-  if (item.key === 'note') showNote.value = true
+  active.value = item.key
+}
+
+function close() {
+  active.value = ''
 }
 </script>
 

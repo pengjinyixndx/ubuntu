@@ -40,9 +40,18 @@ export const MOCK_EVENTS: CoupleEvent[] = [
     actor_id: MOCK_ME.id,
     type: 'note',
     content: '今天路过那家店，又想起你上次说想喝的那杯，下次一起去。',
-    photo_urls: null,
+    photo_urls: ['https://images.unsplash.com/photo-1490750967868-88aa4486c946?w=600&q=70'],
     meta: null,
     created_at: ago(8)
+  },
+  {
+    id: 'e-09',
+    actor_id: MOCK_PARTNER.id,
+    type: 'milktea',
+    content: '今天这杯特别甜，下次带你喝同一家。',
+    photo_urls: null,
+    meta: { flavor: '珍珠', sweetness: '半糖' },
+    created_at: ago(24)
   },
   {
     id: 'e-02',
@@ -51,7 +60,7 @@ export const MOCK_EVENTS: CoupleEvent[] = [
     content:
       '今天下班早，天还没黑透就到家了。路上买了一把小雏菊，插在窗台的玻璃瓶里，白色的花瓣有点卷，看着很安静。\n\n做饭的时候把盐放多了，自己笑得不行，想起你上次也是这样，还硬说很好吃。后来我把剩下的一半留起来了，想着你来了可以尝尝，虽然大概率还是咸的。\n\n晚上看了会儿书，风从窗户进来，把书页吹得哗哗响。忽然觉得这样的日子也很好，不吵不闹，慢一点也没关系。等你回来。',
     photo_urls: null,
-    meta: null,
+    meta: { weather: 'sunny', mood: 'happy' },
     created_at: ago(52)
   },
   {

@@ -1,42 +1,63 @@
 <template>
   <Teleport to="body">
     <div class="overlay">
-      <!-- 顶部栏 -->
       <header class="editor-bar">
         <button type="button" class="icon-btn" @click="emit('close')" aria-label="关闭">
           <X :size="22" :stroke-width="1.6" />
         </button>
-        <span class="editor-title">写随笔</span>
+        <span class="editor-title">喝奶茶</span>
         <button type="button" class="stamp-btn" :disabled="!canSave" @click="save">
           <Loader v-if="saving" :size="14" class="spin" />
-          <span v-else>寄出</span>
+          <span v-else>记下</span>
         </button>
       </header>
 
-      <!-- 明信片 -->
+      <!-- 奶茶小卡 -->
       <div class="paper-wrap">
-        <div class="postcard">
+        <div class="mt-card">
           <span class="tape"></span>
 
-          <!-- 一张随手拍（可不加） -->
-          <div class="photo-slot">
-            <button v-if="!photoUrl" type="button" class="photo-empty" @click="picker?.open()">
-              <Plus :size="18" :stroke-width="1.8" />
-              <span>随手拍一张（可不加）</span>
-            </button>
-            <div v-else class="photo-have">
-              <img :src="photoUrl" alt="随手拍" />
-              <button type="button" class="photo-del" aria-label="删掉照片" @click="clearPhoto">
-                <X :size="13" :stroke-width="2" />
+          <div class="mt-head">
+            <CupSoda :size="26" :stroke-width="1.5" class="mt-cup" />
+            <span class="mt-title">今天喝的这杯</span>
+          </div>
+
+          <div class="mt-block">
+            <span class="mt-label">口味</span>
+            <div class="chips">
+              <button
+                v-for="f in TEA_FLAVORS"
+                :key="f"
+                type="button"
+                class="chip"
+                :class="{ on: flavor === f }"
+                @click="flavor = flavor === f ? '' : f"
+              >
+                {{ f }}
+              </button>
+            </div>
+          </div>
+
+          <div class="mt-block">
+            <span class="mt-label">甜度</span>
+            <div class="chips">
+              <button
+                v-for="s in TEA_SWEETNESS"
+                :key="s"
+                type="button"
+                class="chip"
+                :class="{ on: sweet === s }"
+                @click="sweet = sweet === s ? '' : s"
+              >
+                {{ s }}
               </button>
             </div>
           </div>
 
           <textarea
-            ref="taRef"
             v-model="text"
-            class="writing"
-            :placeholder="placeholder"
+            class="mt-note"
+            placeholder="这杯有多甜？想说点什么……"
           ></textarea>
         </div>
       </div>
@@ -46,95 +67,57 @@
         <span v-else class="foot-count">{{ text.length }} 字</span>
       </footer>
 
-      <!-- 桌面边缘小生物 -->
       <div class="edge-decor" aria-hidden="true">
         <div class="crawler"><Critter kind="crab" :size="40" /></div>
         <Critter class="ginkgo g1" kind="ginkgo" :size="34" />
-        <Critter class="ginkgo g2" kind="ginkgo" :size="24" />
       </div>
 
-      <PhotoPicker ref="picker" @picked="onPicked" />
-      <PublishFlash v-if="flash" type="note" @done="emit('close')" />
+      <PublishFlash v-if="flash" type="milktea" @done="emit('close')" />
     </div>
   </Teleport>
 </template>
 
 <script setup lang="ts">
-import { computed, onMounted, ref } from 'vue'
-import { X, Loader, Plus } from 'lucide-vue-next'
+import { computed, ref } from 'vue'
+import { X, Loader, CupSoda } from 'lucide-vue-next'
 import { useFeed } from '../composables/useFeed'
+import { TEA_FLAVORS, TEA_SWEETNESS } from '../lib/options'
 import Critter from './Critter.vue'
-import PhotoPicker from './PhotoPicker.vue'
 import PublishFlash from './PublishFlash.vue'
 
 const emit = defineEmits<{ close: [] }>()
-const { publishEvent, uploadPhoto, myProfile, ensureMe } = useFeed()
+const { publishEvent } = useFeed()
 
+const flavor = ref('')
+const sweet = ref('')
 const text = ref('')
 const saving = ref(false)
 const errMsg = ref('')
 const flash = ref(false)
-const taRef = ref<HTMLTextAreaElement | null>(null)
-const picker = ref<InstanceType<typeof PhotoPicker> | null>(null)
 
-// 一张随手拍（可选）
-const photo = ref<File | null>(null)
-const photoUrl = ref('')
-
-const canSave = computed(() => (text.value.trim().length > 0 || !!photo.value) && !saving.value)
-const partner = computed(() => (myProfile.value?.gender === 'female' ? '他' : '她'))
-const placeholder = computed(() => `写${partner.value}的话，随手记两句……`)
-
-function onPicked(files: File[]) {
-  const f = files[0]
-  if (!f) return
-  if (photoUrl.value) URL.revokeObjectURL(photoUrl.value)
-  photo.value = f
-  photoUrl.value = URL.createObjectURL(f)
-}
-
-function clearPhoto() {
-  if (photoUrl.value) URL.revokeObjectURL(photoUrl.value)
-  photo.value = null
-  photoUrl.value = ''
-}
+const canSave = computed(() => (!!flavor.value || !!sweet.value || text.value.trim().length > 0) && !saving.value)
 
 async function save() {
   if (!canSave.value) return
   saving.value = true
   errMsg.value = ''
 
-  let urls: string[] | undefined
-  if (photo.value) {
-    const { url, error } = await uploadPhoto(photo.value)
-    if (error || !url) {
-      saving.value = false
-      errMsg.value = '照片没传上去，再试一次'
-      return
-    }
-    urls = [url]
-  }
-
   const { error } = await publishEvent({
-    type: 'note',
+    type: 'milktea',
     content: text.value.trim(),
-    photo_urls: urls
+    meta: { flavor: flavor.value || null, sweetness: sweet.value || null }
   })
   saving.value = false
 
   if (error) {
-    errMsg.value = '没寄出去，再试一次'
+    errMsg.value = '没记上，再试一次'
     return
   }
+  flavor.value = ''
+  sweet.value = ''
   text.value = ''
-  clearPhoto()
-  flash.value = true // 播完动画再关闭
+  flash.value = true
 }
-
-onMounted(() => {
-  ensureMe()
-  taRef.value?.focus()
-})
 </script>
 
 <style scoped>
@@ -160,7 +143,6 @@ onMounted(() => {
   padding: 10px 14px;
   border-bottom: var(--border-dashed);
 }
-
 .icon-btn {
   display: flex;
   align-items: center;
@@ -172,14 +154,12 @@ onMounted(() => {
   border: none;
   cursor: pointer;
 }
-
 .editor-title {
   font-family: var(--font-hand);
   font-size: var(--fs-lg);
   color: var(--ink);
   letter-spacing: 2px;
 }
-
 .stamp-btn {
   display: flex;
   align-items: center;
@@ -203,7 +183,6 @@ onMounted(() => {
   box-shadow: none;
   cursor: not-allowed;
 }
-
 .spin {
   animation: spin 1s linear infinite;
 }
@@ -213,26 +192,25 @@ onMounted(() => {
   }
 }
 
-/* —— 明信片 —— */
+/* —— 奶茶小卡 —— */
 .paper-wrap {
   flex: 1;
-  display: flex;
   min-height: 0;
+  display: flex;
   padding: 16px 14px calc(50px + env(safe-area-inset-bottom));
 }
 
-.postcard {
+.mt-card {
   position: relative;
   flex: 1;
   display: flex;
   flex-direction: column;
   min-height: 0;
-  padding: 16px 16px 14px;
+  padding: 18px 16px 14px;
   background-color: var(--photo);
   border: var(--border);
   border-radius: var(--r-sm);
   box-shadow: var(--shadow-card);
-  transform: rotate(-0.8deg);
 }
 
 .tape {
@@ -252,76 +230,74 @@ onMounted(() => {
   );
 }
 
-/* —— 随手拍一张 —— */
-.photo-slot {
-  flex-shrink: 0;
-  margin-bottom: 12px;
-}
-
-.photo-empty {
+.mt-head {
   display: flex;
   align-items: center;
   justify-content: center;
+  gap: 8px;
+  padding-bottom: 14px;
+  border-bottom: var(--border-dashed);
+}
+.mt-cup {
+  color: var(--brick);
+}
+.mt-title {
+  font-family: var(--font-hand);
+  font-size: var(--fs-md);
+  color: var(--ink-soft);
+  letter-spacing: 1px;
+}
+
+.mt-block {
+  margin-top: 14px;
+}
+.mt-label {
+  display: block;
+  margin-bottom: 7px;
+  font-family: var(--font-typewriter);
+  font-size: var(--fs-xs);
+  letter-spacing: 2px;
+  color: var(--muted);
+}
+
+.chips {
+  display: flex;
+  flex-wrap: wrap;
   gap: 7px;
-  width: 100%;
-  height: 84px;
-  color: var(--faint);
-  background-color: transparent;
-  border: 1.5px dashed var(--line-strong);
-  border-radius: var(--r-sm);
+}
+.chip {
+  padding: 6px 12px;
   font-family: var(--font-song);
   font-size: var(--fs-sm);
-  letter-spacing: 1px;
-  cursor: pointer;
-}
-
-.photo-have {
-  position: relative;
-  height: 168px;
+  color: var(--muted);
+  background-color: transparent;
   border: var(--border);
-  border-radius: var(--r-sm);
-  overflow: hidden;
-  background-color: var(--paper-deep);
-}
-
-.photo-have img {
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
-}
-
-.photo-del {
-  position: absolute;
-  top: 6px;
-  right: 6px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  width: 26px;
-  height: 26px;
-  color: var(--photo);
-  background-color: rgba(43, 37, 29, 0.55);
-  border: none;
-  border-radius: 50%;
+  border-radius: 999px;
   cursor: pointer;
 }
+.chip.on {
+  color: var(--photo);
+  background-color: var(--caramel);
+  border-color: var(--caramel);
+}
 
-/* —— 正文 —— */
-.writing {
+.mt-note {
   flex: 1;
   width: 100%;
-  min-height: 0;
+  min-height: 90px;
+  margin-top: 16px;
+  padding-top: 12px;
   resize: none;
   border: none;
+  border-top: var(--border-dashed);
   outline: none;
   background-color: transparent;
   font-family: var(--font-song);
-  font-size: var(--fs-lg);
+  font-size: var(--fs-md);
   line-height: 1.9;
   color: var(--ink);
 }
-
-.writing::placeholder {
+.mt-note::placeholder {
   color: var(--faint);
 }
 
@@ -365,11 +341,6 @@ onMounted(() => {
   top: 66px;
   right: 8px;
   opacity: 0.5;
-}
-.ginkgo.g2 {
-  top: 114px;
-  right: 40px;
-  opacity: 0.3;
 }
 @keyframes crawl-drift {
   from {

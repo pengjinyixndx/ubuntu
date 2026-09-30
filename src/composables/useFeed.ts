@@ -73,6 +73,21 @@ async function publishEvent(input: {
   return { error: null }
 }
 
+/** 上传一张图片（用于随笔的单图、照片的多图） */
+async function uploadPhoto(file: File): Promise<{ url: string | null; error: unknown }> {
+  const source = await getFeedSource()
+  return source.uploadPhoto(file)
+}
+
 export function useFeed() {
-  return { events, myProfile, loading, loadError, ensureMe, loadEvents, publishEvent }
+  return {
+    events,
+    myProfile,
+    loading,
+    loadError,
+    ensureMe,
+    loadEvents,
+    publishEvent,
+    uploadPhoto
+  }
 }

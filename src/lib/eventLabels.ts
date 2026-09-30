@@ -13,6 +13,7 @@ export const ACTION_LABELS: Record<EventType, string> = {
   note: '写了随笔',
   diary: '写了日记',
   photo: '发了照片',
+  milktea: '记了一杯奶茶',
   milktea_issue: '颁发了奶茶券',
   milktea_redeem: '核销了奶茶券',
   wish: '添加了心愿'
