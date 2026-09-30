@@ -41,9 +41,3 @@ export function timeLabel(iso: string): string {
   if (d.getFullYear() === now.getFullYear()) return `${d.getMonth() + 1}月${d.getDate()}日`
   return `${d.getFullYear()}.${d.getMonth() + 1}.${d.getDate()}`
 }
-
-/** 详情弹层用的完整时间：2026年9月30日 14:23 */
-export function dateTimeLabel(iso: string): string {
-  const d = new Date(iso)
-  return `${d.getFullYear()}年${d.getMonth() + 1}月${d.getDate()}日 ${pad2(d.getHours())}:${pad2(d.getMinutes())}`
-}
