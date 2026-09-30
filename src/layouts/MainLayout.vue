@@ -3,7 +3,8 @@
     <!-- 页面内容区 -->
     <main class="content">
       <router-view v-slot="{ Component }">
-        <transition name="fade" mode="out-in">
+        <!-- 不用 out-in：那会让新页等旧页完全淡出后才进场，切 Tab 会有明显空档 -->
+        <transition name="fade">
           <component :is="Component" />
         </transition>
       </router-view>
@@ -112,10 +113,10 @@ const switchTab = (path: string) => {
   color: var(--caramel);
 }
 
-/* —— 页面淡入淡出 —— */
+/* —— 页面淡入淡出（快、轻，别拖慢切 Tab）—— */
 .fade-enter-active,
 .fade-leave-active {
-  transition: opacity 0.22s ease;
+  transition: opacity 0.13s ease;
 }
 .fade-enter-from,
 .fade-leave-to {
