@@ -1,7 +1,7 @@
 <template>
   <svg
     class="critter"
-    :class="kind"
+    :class="[kind, { still }]"
     :style="{ width: size + 'px', height: 'auto' }"
     :viewBox="kind === 'crab' ? '0 0 72 62' : '0 0 60 58'"
     fill="none"
@@ -64,14 +64,21 @@ withDefaults(
     kind: 'crab' | 'ginkgo'
     /** 宽度（px），高度按比例 */
     size?: number
+    /** 静止不动（比如印在邮票上） */
+    still?: boolean
   }>(),
-  { size: 40 }
+  { size: 40, still: false }
 )
 </script>
 
 <style scoped>
 .critter {
   display: block;
+}
+
+/* 静止版：不做动画 */
+.critter.still {
+  animation: none !important;
 }
 
 /* 螃蟹：左右轻轻摇晃、上下微顿，像在爬 */

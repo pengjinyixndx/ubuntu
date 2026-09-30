@@ -13,29 +13,39 @@
         </button>
       </header>
 
-      <!-- 明信片 -->
+      <!-- 一张明信片 -->
       <div class="paper-wrap">
         <div class="postcard">
-          <span class="tape"></span>
-
-          <!-- 一张随手拍（可不加） -->
-          <div class="photo-slot">
-            <button v-if="!photoUrl" type="button" class="photo-empty" @click="picker?.open()">
-              <Plus :size="18" :stroke-width="1.8" />
-              <span>随手拍一张（可不加）</span>
-            </button>
-            <div v-else class="photo-have">
-              <img :src="photoUrl" alt="随手拍" />
-              <button type="button" class="photo-del" aria-label="删掉照片" @click="clearPhoto">
-                <X :size="13" :stroke-width="2" />
+          <div class="post-top">
+            <!-- 左：贴一张随手拍 -->
+            <div class="post-photo">
+              <button v-if="!photoUrl" type="button" class="photo-empty" @click="picker?.open()">
+                <Plus :size="17" :stroke-width="1.8" />
+                <span>贴张随手拍</span>
               </button>
+              <div v-else class="photo-have">
+                <img :src="photoUrl" alt="随手拍" />
+                <button type="button" class="photo-del" aria-label="删掉照片" @click="clearPhoto">
+                  <X :size="12" :stroke-width="2.2" />
+                </button>
+              </div>
+            </div>
+
+            <!-- 右：邮票 + 邮戳（谁写的用谁的票） -->
+            <div class="post-stamps">
+              <span class="postmark">{{ stampDate }}</span>
+              <span class="stamp">
+                <Critter :kind="writerKind" :size="24" still />
+                <em>青桃</em>
+              </span>
             </div>
           </div>
 
+          <!-- 右下：写着的话 -->
           <textarea
             ref="taRef"
             v-model="text"
-            class="writing"
+            class="post-msg"
             :placeholder="placeholder"
           ></textarea>
         </div>
@@ -85,6 +95,18 @@ const canSave = computed(() => (text.value.trim().length > 0 || !!photo.value) &
 const partner = computed(() => (myProfile.value?.gender === 'female' ? '他' : '她'))
 const placeholder = computed(() => `写${partner.value}的话，随手记两句……`)
 
+// 谁写的，邮票上就印谁的符号：他=螃蟹，她=银杏叶
+const writerKind = computed<'crab' | 'ginkgo'>(() =>
+  myProfile.value?.gender === 'female' ? 'ginkgo' : 'crab'
+)
+
+// 邮戳上的日期：2026.09.30
+const stampDate = computed(() => {
+  const d = new Date()
+  const p = (n: number) => String(n).padStart(2, '0')
+  return `${d.getFullYear()}.${p(d.getMonth() + 1)}.${p(d.getDate())}`
+})
+
 function onPicked(files: File[]) {
   const f = files[0]
   if (!f) return
@@ -128,7 +150,7 @@ async function save() {
   }
   text.value = ''
   clearPhoto()
-  flash.value = true // 播完动画再关闭
+  flash.value = true
 }
 
 onMounted(() => {
@@ -160,7 +182,6 @@ onMounted(() => {
   padding: 10px 14px;
   border-bottom: var(--border-dashed);
 }
-
 .icon-btn {
   display: flex;
   align-items: center;
@@ -172,14 +193,12 @@ onMounted(() => {
   border: none;
   cursor: pointer;
 }
-
 .editor-title {
   font-family: var(--font-hand);
   font-size: var(--fs-lg);
   color: var(--ink);
   letter-spacing: 2px;
 }
-
 .stamp-btn {
   display: flex;
   align-items: center;
@@ -203,7 +222,6 @@ onMounted(() => {
   box-shadow: none;
   cursor: not-allowed;
 }
-
 .spin {
   animation: spin 1s linear infinite;
 }
@@ -213,92 +231,88 @@ onMounted(() => {
   }
 }
 
-/* —— 明信片 —— */
+/* —— 明信片（横版）—— */
 .paper-wrap {
   flex: 1;
-  display: flex;
   min-height: 0;
-  padding: 16px 14px calc(50px + env(safe-area-inset-bottom));
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+  padding: 22px 14px 0;
 }
 
 .postcard {
   position: relative;
-  flex: 1;
+  width: 100%;
+  aspect-ratio: 4 / 3;
   display: flex;
   flex-direction: column;
-  min-height: 0;
-  padding: 16px 16px 14px;
+  gap: 12px;
+  padding: 15px 15px 12px;
   background-color: var(--photo);
   border: var(--border);
   border-radius: var(--r-sm);
   box-shadow: var(--shadow-card);
-  transform: rotate(-0.8deg);
+  transform: rotate(-0.7deg);
 }
 
-.tape {
-  position: absolute;
-  top: -10px;
-  left: 50%;
-  width: 54px;
-  height: 18px;
-  transform: translateX(-50%) rotate(-3deg);
-  background-color: var(--tape);
-  background-image: repeating-linear-gradient(
-    90deg,
-    transparent 0,
-    transparent 6px,
-    rgba(255, 255, 255, 0.35) 6px,
-    rgba(255, 255, 255, 0.35) 12px
-  );
-}
-
-/* —— 随手拍一张 —— */
-.photo-slot {
+/* 上排：随手拍 + 邮票邮戳 */
+.post-top {
   flex-shrink: 0;
-  margin-bottom: 12px;
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 10px;
+  min-height: 104px;
+}
+
+.post-photo {
+  flex: 1 1 auto;
+  max-width: 48%;
+  height: 104px;
 }
 
 .photo-empty {
+  width: 100%;
+  height: 100%;
   display: flex;
+  flex-direction: column;
   align-items: center;
   justify-content: center;
-  gap: 7px;
-  width: 100%;
-  height: 84px;
+  gap: 5px;
   color: var(--faint);
   background-color: transparent;
   border: 1.5px dashed var(--line-strong);
   border-radius: var(--r-sm);
   font-family: var(--font-song);
-  font-size: var(--fs-sm);
+  font-size: var(--fs-xs);
   letter-spacing: 1px;
   cursor: pointer;
 }
 
 .photo-have {
   position: relative;
-  height: 168px;
+  width: 100%;
+  height: 100%;
   border: var(--border);
   border-radius: var(--r-sm);
   overflow: hidden;
   background-color: var(--paper-deep);
 }
-
 .photo-have img {
   width: 100%;
   height: 100%;
   object-fit: cover;
 }
-
 .photo-del {
   position: absolute;
-  top: 6px;
-  right: 6px;
+  top: 5px;
+  right: 5px;
   display: flex;
   align-items: center;
   justify-content: center;
-  width: 26px;
-  height: 26px;
+  width: 24px;
+  height: 24px;
   color: var(--photo);
   background-color: rgba(43, 37, 29, 0.55);
   border: none;
@@ -306,8 +320,66 @@ onMounted(() => {
   cursor: pointer;
 }
 
-/* —— 正文 —— */
-.writing {
+/* —— 邮票 + 邮戳 —— */
+.post-stamps {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+}
+
+/* 邮戳：椭圆、斜压一角，里面带日期 */
+.postmark {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 68px;
+  height: 42px;
+  margin-right: -10px;
+  border: 1.5px solid rgba(173, 79, 56, 0.45);
+  border-radius: 50%;
+  transform: rotate(-14deg);
+  font-family: var(--font-typewriter);
+  font-size: 9px;
+  letter-spacing: 0.5px;
+  color: rgba(173, 79, 56, 0.62);
+  position: relative;
+  z-index: 1;
+}
+
+/* 邮票：小方票 + 齿孔边 + 写的人的符号 */
+.stamp {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 1px;
+  width: 48px;
+  height: 58px;
+  background-color: var(--photo);
+  border: 1px solid var(--line-strong);
+  box-shadow: 0 1px 3px rgba(84, 62, 30, 0.18);
+  transform: rotate(3deg);
+  color: var(--caramel);
+}
+/* 齿孔：内层虚线框 */
+.stamp::before {
+  content: '';
+  position: absolute;
+  inset: 3px;
+  border: 1px dashed var(--line);
+  pointer-events: none;
+}
+.stamp em {
+  font-family: var(--font-song);
+  font-size: 8px;
+  font-style: normal;
+  letter-spacing: 1.5px;
+  color: var(--caramel);
+}
+
+/* —— 写着的话 —— */
+.post-msg {
   flex: 1;
   width: 100%;
   min-height: 0;
@@ -315,13 +387,20 @@ onMounted(() => {
   border: none;
   outline: none;
   background-color: transparent;
+  background-image: linear-gradient(
+    to bottom,
+    transparent 0,
+    transparent 27px,
+    var(--line) 27px,
+    var(--line) 28px
+  );
   font-family: var(--font-song);
-  font-size: var(--fs-lg);
-  line-height: 1.9;
+  font-size: var(--fs-md);
+  line-height: 28px;
+  padding-top: 5px;
   color: var(--ink);
 }
-
-.writing::placeholder {
+.post-msg::placeholder {
   color: var(--faint);
 }
 
@@ -362,14 +441,14 @@ onMounted(() => {
   color: var(--caramel);
 }
 .ginkgo.g1 {
-  top: 66px;
-  right: 8px;
-  opacity: 0.5;
+  top: calc(50% + 40px);
+  right: 12px;
+  opacity: 0.42;
 }
 .ginkgo.g2 {
-  top: 114px;
-  right: 40px;
-  opacity: 0.3;
+  top: calc(50% + 96px);
+  left: 18px;
+  opacity: 0.26;
 }
 @keyframes crawl-drift {
   from {

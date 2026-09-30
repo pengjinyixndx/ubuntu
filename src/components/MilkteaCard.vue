@@ -1,10 +1,7 @@
 <template>
   <div class="mcard" :class="{ compact }">
-    <div class="mcard-top">
-      <Critter kind="ginkgo" :size="compact ? 18 : 22" class="mcard-leaf" />
-      <span class="mcard-label">奶茶卡</span>
-      <span class="mcard-owner">她的</span>
-    </div>
+    <!-- 她的符号：银杏叶，做个小水印 -->
+    <Critter kind="ginkgo" :size="compact ? 16 : 18" class="mcard-leaf" />
 
     <div class="mcard-count">
       本周还能喝
@@ -72,49 +69,31 @@ onMounted(() => {
   padding: 13px 14px 12px;
 }
 
-/* —— 抬头 —— */
-.mcard-top {
-  display: flex;
-  align-items: center;
-  gap: 7px;
-}
 .mcard-leaf {
+  position: absolute;
+  top: 12px;
+  right: 12px;
   color: var(--caramel);
-}
-.mcard-label {
-  font-family: var(--font-hand);
-  font-size: var(--fs-md);
-  letter-spacing: 1px;
-  color: var(--ink);
-}
-.mcard-owner {
-  margin-left: auto;
-  padding: 2px 8px;
-  font-family: var(--font-song);
-  font-size: var(--fs-xs);
-  color: var(--caramel);
-  border: 1px solid var(--line);
-  border-radius: 999px;
+  opacity: 0.75;
 }
 
 /* —— 数字 —— */
 .mcard-count {
-  margin-top: 10px;
   font-family: var(--font-song);
   font-size: var(--fs-sm);
   letter-spacing: 1px;
   color: var(--muted);
 }
 .mcard-count b {
-  margin: 0 4px;
+  margin: 0 5px;
   font-family: var(--font-serif);
-  font-size: 30px;
+  font-size: 34px;
   color: var(--ink);
-  vertical-align: -3px;
+  vertical-align: -4px;
 }
 
 .mcard-sub {
-  margin-top: 3px;
+  margin-top: 4px;
   font-family: var(--font-typewriter);
   font-size: var(--fs-xs);
   color: var(--faint);
@@ -128,7 +107,7 @@ onMounted(() => {
   display: flex;
   flex-wrap: wrap;
   gap: 7px;
-  margin-top: 13px;
+  margin-top: 14px;
   padding-top: 13px;
   border-top: var(--border-dashed);
 }
@@ -164,14 +143,14 @@ onMounted(() => {
 
 /* 紧凑版（我的页） */
 .compact .mcard-count b {
-  font-size: 24px;
+  font-size: 26px;
 }
 .compact .slot {
   width: 28px;
   height: 28px;
 }
 .compact .slots {
-  margin-top: 10px;
+  margin-top: 11px;
   padding-top: 10px;
 }
 </style>
