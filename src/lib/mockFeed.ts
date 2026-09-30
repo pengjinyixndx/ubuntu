@@ -47,10 +47,10 @@ export const MOCK_EVENTS: CoupleEvent[] = [
   {
     id: 'e-09',
     actor_id: MOCK_PARTNER.id,
-    type: 'milktea',
+    type: 'milktea_redeem',
     content: '今天这杯特别甜，下次带你喝同一家。',
     photo_urls: null,
-    meta: { flavor: '珍珠', sweetness: '半糖' },
+    meta: { source: 'free', flavor: '珍珠', sweetness: '半糖' },
     created_at: ago(24)
   },
   {
@@ -89,10 +89,19 @@ export const MOCK_EVENTS: CoupleEvent[] = [
     id: 'e-05',
     actor_id: MOCK_PARTNER.id,
     type: 'milktea_redeem',
-    content: '核销了一张珍珠奶茶券',
+    content: '用券换了一杯，奶盖很厚。',
     photo_urls: null,
-    meta: { count: 1 },
+    meta: { source: 'voucher', flavor: '奶盖', sweetness: '三分糖' },
     created_at: ago(430)
+  },
+  {
+    id: 'e-10',
+    actor_id: MOCK_ME.id,
+    type: 'milktea_issue',
+    content: '奶盖奶茶券 · 一张',
+    photo_urls: null,
+    meta: { count: 1, reason: '这周表现好' },
+    created_at: ago(1200)
   },
   {
     id: 'e-06',

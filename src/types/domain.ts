@@ -10,9 +10,8 @@ export type EventType =
   | 'note' // 随笔
   | 'diary' // 日记
   | 'photo' // 照片
-  | 'milktea' // 喝奶茶（随手记一杯）
-  | 'milktea_issue' // 颁发奶茶券
-  | 'milktea_redeem' // 核销奶茶券
+  | 'milktea_issue' // 颁发奶茶券（他给她）
+  | 'milktea_redeem' // 核销奶茶券 / 喝奶茶
   | 'wish' // 添加心愿
 
 // 账号档案：auth.users 的扩展，补充性别

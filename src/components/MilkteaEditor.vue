@@ -6,22 +6,18 @@
           <X :size="22" :stroke-width="1.6" />
         </button>
         <span class="editor-title">喝奶茶</span>
-        <button type="button" class="stamp-btn" :disabled="!canSave" @click="save">
+        <button type="button" class="stamp-btn" :disabled="!canRedeem" @click="save">
           <Loader v-if="saving" :size="14" class="spin" />
-          <span v-else>记下</span>
+          <span v-else>盖章</span>
         </button>
       </header>
 
-      <!-- 奶茶小卡 -->
       <div class="paper-wrap">
-        <div class="mt-card">
-          <span class="tape"></span>
+        <!-- 她的集点卡 -->
+        <MilkteaCard />
 
-          <div class="mt-head">
-            <CupSoda :size="26" :stroke-width="1.5" class="mt-cup" />
-            <span class="mt-title">今天喝的这杯</span>
-          </div>
-
+        <!-- 这杯是什么 -->
+        <div class="form">
           <div class="mt-block">
             <span class="mt-label">口味</span>
             <div class="chips">
@@ -57,36 +53,36 @@
           <textarea
             v-model="text"
             class="mt-note"
-            placeholder="这杯有多甜？想说点什么……"
+            placeholder="今天这杯，想说点什么……"
           ></textarea>
         </div>
       </div>
 
       <footer class="editor-foot">
         <span v-if="errMsg" class="foot-err">{{ errMsg }}</span>
-        <span v-else class="foot-count">{{ text.length }} 字</span>
+        <span v-else class="foot-count">{{ quotaHint }}</span>
       </footer>
 
       <div class="edge-decor" aria-hidden="true">
         <div class="crawler"><Critter kind="crab" :size="40" /></div>
-        <Critter class="ginkgo g1" kind="ginkgo" :size="34" />
       </div>
 
-      <PublishFlash v-if="flash" type="milktea" @done="emit('close')" />
+      <PublishFlash v-if="flash" type="milktea_redeem" @done="emit('close')" />
     </div>
   </Teleport>
 </template>
 
 <script setup lang="ts">
 import { computed, ref } from 'vue'
-import { X, Loader, CupSoda } from 'lucide-vue-next'
-import { useFeed } from '../composables/useFeed'
+import { X, Loader } from 'lucide-vue-next'
+import { useMilktea } from '../composables/useMilktea'
 import { TEA_FLAVORS, TEA_SWEETNESS } from '../lib/options'
 import Critter from './Critter.vue'
+import MilkteaCard from './MilkteaCard.vue'
 import PublishFlash from './PublishFlash.vue'
 
 const emit = defineEmits<{ close: [] }>()
-const { publishEvent } = useFeed()
+const { drinkable, nextSource, redeem } = useMilktea()
 
 const flavor = ref('')
 const sweet = ref('')
@@ -95,22 +91,28 @@ const saving = ref(false)
 const errMsg = ref('')
 const flash = ref(false)
 
-const canSave = computed(() => (!!flavor.value || !!sweet.value || text.value.trim().length > 0) && !saving.value)
+const canRedeem = computed(() => drinkable.value > 0 && !saving.value)
+
+const quotaHint = computed(() => {
+  if (nextSource.value === 'free') return '这次用「本周免费」'
+  if (nextSource.value === 'voucher') return '这次用掉一张奶茶券'
+  return '这周的额度用完了'
+})
 
 async function save() {
-  if (!canSave.value) return
+  if (!canRedeem.value) return
   saving.value = true
   errMsg.value = ''
 
-  const { error } = await publishEvent({
-    type: 'milktea',
-    content: text.value.trim(),
-    meta: { flavor: flavor.value || null, sweetness: sweet.value || null }
+  const { error } = await redeem({
+    flavor: flavor.value,
+    sweetness: sweet.value,
+    content: text.value.trim()
   })
   saving.value = false
 
   if (error) {
-    errMsg.value = '没记上，再试一次'
+    errMsg.value = '没盖上章，再试一次'
     return
   }
   flavor.value = ''
@@ -192,63 +194,24 @@ async function save() {
   }
 }
 
-/* —— 奶茶小卡 —— */
 .paper-wrap {
   flex: 1;
   min-height: 0;
-  display: flex;
+  overflow-y: auto;
   padding: 16px 14px calc(50px + env(safe-area-inset-bottom));
 }
 
-.mt-card {
-  position: relative;
-  flex: 1;
-  display: flex;
-  flex-direction: column;
-  min-height: 0;
-  padding: 18px 16px 14px;
+/* —— 这杯是什么 —— */
+.form {
+  margin-top: 14px;
+  padding: 16px 15px 14px;
   background-color: var(--photo);
   border: var(--border);
   border-radius: var(--r-sm);
   box-shadow: var(--shadow-card);
 }
 
-.tape {
-  position: absolute;
-  top: -10px;
-  left: 50%;
-  width: 54px;
-  height: 18px;
-  transform: translateX(-50%) rotate(-3deg);
-  background-color: var(--tape);
-  background-image: repeating-linear-gradient(
-    90deg,
-    transparent 0,
-    transparent 6px,
-    rgba(255, 255, 255, 0.35) 6px,
-    rgba(255, 255, 255, 0.35) 12px
-  );
-}
-
-.mt-head {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 8px;
-  padding-bottom: 14px;
-  border-bottom: var(--border-dashed);
-}
-.mt-cup {
-  color: var(--brick);
-}
-.mt-title {
-  font-family: var(--font-hand);
-  font-size: var(--fs-md);
-  color: var(--ink-soft);
-  letter-spacing: 1px;
-}
-
-.mt-block {
+.mt-block + .mt-block {
   margin-top: 14px;
 }
 .mt-label {
@@ -265,26 +228,26 @@ async function save() {
   flex-wrap: wrap;
   gap: 7px;
 }
+/* 标签做成「小印章/小贴纸」的样子，不用圆药丸 */
 .chip {
-  padding: 6px 12px;
+  padding: 6px 11px;
   font-family: var(--font-song);
   font-size: var(--fs-sm);
   color: var(--muted);
   background-color: transparent;
-  border: var(--border);
-  border-radius: 999px;
+  border: 1px dashed var(--line-strong);
+  border-radius: var(--r-sm);
   cursor: pointer;
 }
 .chip.on {
   color: var(--photo);
   background-color: var(--caramel);
-  border-color: var(--caramel);
+  border: 1px solid var(--caramel);
 }
 
 .mt-note {
-  flex: 1;
   width: 100%;
-  min-height: 90px;
+  min-height: 84px;
   margin-top: 16px;
   padding-top: 12px;
   resize: none;
@@ -314,12 +277,12 @@ async function save() {
   color: var(--brick);
 }
 .foot-count {
-  font-family: var(--font-typewriter);
-  font-size: var(--fs-xs);
-  color: var(--faint);
+  font-family: var(--font-song);
+  font-size: var(--fs-sm);
+  color: var(--muted);
 }
 
-/* —— 桌面小生物 —— */
+/* —— 桌面小生物（只有螃蟹：她的卡由他管）—— */
 .edge-decor {
   position: absolute;
   inset: 0;
@@ -332,15 +295,6 @@ async function save() {
   bottom: calc(48px + env(safe-area-inset-bottom));
   color: var(--caramel);
   animation: crawl-drift 22s ease-in-out infinite alternate;
-}
-.ginkgo {
-  position: absolute;
-  color: var(--caramel);
-}
-.ginkgo.g1 {
-  top: 66px;
-  right: 8px;
-  opacity: 0.5;
 }
 @keyframes crawl-drift {
   from {

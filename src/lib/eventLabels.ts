@@ -13,10 +13,14 @@ export const ACTION_LABELS: Record<EventType, string> = {
   note: '写了随笔',
   diary: '写了日记',
   photo: '发了照片',
-  milktea: '记了一杯奶茶',
   milktea_issue: '颁发了奶茶券',
   milktea_redeem: '核销了奶茶券',
   wish: '添加了心愿'
+}
+
+/** 核销奶茶的抬头：用「本周免费」和「奶茶券」说法不同 */
+export function milkteaAction(source: unknown): string {
+  return source === 'free' ? '喝了一杯奶茶' : '核销了奶茶券'
 }
 
 function pad2(n: number): string {

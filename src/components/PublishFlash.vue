@@ -10,7 +10,7 @@
         </div>
 
         <!-- 奶茶：两缕热气 -->
-        <div v-if="type === 'milktea'" class="flash-steam" aria-hidden="true">
+        <div v-if="type === 'milktea_redeem'" class="flash-steam" aria-hidden="true">
           <i></i><i></i>
         </div>
 
@@ -32,7 +32,6 @@ const ICONS = {
   note: PenLine,
   diary: BookOpen,
   photo: ImagesIcon,
-  milktea: CupSoda,
   milktea_issue: Ticket,
   milktea_redeem: CupSoda,
   wish: Sparkles
@@ -43,9 +42,8 @@ const MAP: Record<EventType, { stamp: string; text: string }> = {
   note: { stamp: '寄', text: '已寄出' },
   diary: { stamp: '录', text: '已收录' },
   photo: { stamp: '印', text: '已冲印' },
-  milktea: { stamp: '甜', text: '已记下' },
   milktea_issue: { stamp: '券', text: '已发出' },
-  milktea_redeem: { stamp: '兑', text: '已核销' },
+  milktea_redeem: { stamp: '章', text: '已盖章' },
   wish: { stamp: '愿', text: '已许下' }
 }
 

@@ -43,7 +43,7 @@ create table if not exists public.events (
   id uuid primary key default gen_random_uuid(),
   actor_id uuid not null references auth.users (id) on delete cascade,
   type text not null check (type in (
-    'note', 'diary', 'photo', 'milktea', 'milktea_issue', 'milktea_redeem', 'wish'
+    'note', 'diary', 'photo', 'milktea_issue', 'milktea_redeem', 'wish'
   )),
   content text,
   photo_urls text[],

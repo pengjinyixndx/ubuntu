@@ -23,8 +23,8 @@
         <span>{{ event.content || '奶茶券' }}</span>
       </div>
 
-      <!-- 喝奶茶 -->
-      <div v-else-if="event.type === 'milktea'" class="tea">
+      <!-- 喝奶茶（核销） -->
+      <div v-else-if="isTea" class="tea">
         <div v-if="teaChips.length" class="chips">
           <span v-for="c in teaChips" :key="c" class="chip">{{ c }}</span>
         </div>
@@ -67,7 +67,7 @@ import {
   Maximize2
 } from 'lucide-vue-next'
 import type { CoupleEvent, Profile } from '../types/domain'
-import { actorLabel, ACTION_LABELS, timeLabel } from '../lib/eventLabels'
+import { actorLabel, ACTION_LABELS, timeLabel, milkteaAction } from '../lib/eventLabels'
 import { WEATHERS, MOODS, labelOfKey } from '../lib/options'
 
 const props = defineProps<{
@@ -83,7 +83,6 @@ const ICONS = {
   note: PenLine,
   diary: BookOpen,
   photo: ImagesIcon,
-  milktea: CupSoda,
   milktea_issue: Ticket,
   milktea_redeem: CupSoda,
   wish: Sparkles
@@ -91,11 +90,14 @@ const ICONS = {
 
 const icon = computed(() => ICONS[props.event.type])
 const actor = computed(() => actorLabel(props.event.actor_id, props.me.id, props.me.gender))
-const action = computed(() => ACTION_LABELS[props.event.type])
-const isText = computed(() => ['note', 'diary', 'wish'].includes(props.event.type))
-const isTicket = computed(
-  () => props.event.type === 'milktea_issue' || props.event.type === 'milktea_redeem'
+const action = computed(() =>
+  props.event.type === 'milktea_redeem'
+    ? milkteaAction(props.event.meta?.source)
+    : ACTION_LABELS[props.event.type]
 )
+const isText = computed(() => ['note', 'diary', 'wish'].includes(props.event.type))
+const isTicket = computed(() => props.event.type === 'milktea_issue')
+const isTea = computed(() => props.event.type === 'milktea_redeem')
 
 // 照片卡片最多预览 3 张，其余折叠成 +N
 const visiblePhotos = computed(() => props.event.photo_urls?.slice(0, 3) ?? [])
@@ -115,9 +117,9 @@ const diaryChips = computed(() => {
   ].filter(Boolean)
 })
 
-// 奶茶的口味 / 甜度
+// 核销奶茶的口味 / 甜度
 const teaChips = computed(() => {
-  if (props.event.type !== 'milktea') return []
+  if (props.event.type !== 'milktea_redeem') return []
   return [props.event.meta?.flavor, props.event.meta?.sweetness].filter(
     (x): x is string => typeof x === 'string' && !!x
   )

@@ -30,6 +30,9 @@
       </div>
     </section>
 
+    <!-- 她的奶茶卡：本周还能喝几杯（他管） -->
+    <MilkteaCard compact />
+
     <!-- 照片墙 -->
     <section class="section">
       <header class="section-head">
@@ -113,6 +116,7 @@ import { Settings, LogOut, ChevronRight, Images, Sparkles } from 'lucide-vue-nex
 import { getTogetherDays } from '../composables/useTogether'
 import { useFeed } from '../composables/useFeed'
 import { USE_MOCK } from '../lib/dataSource'
+import MilkteaCard from '../components/MilkteaCard.vue'
 
 const router = useRouter()
 const { events, myProfile, loading, loadEvents } = useFeed()
