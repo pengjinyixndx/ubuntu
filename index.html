@@ -14,7 +14,7 @@
     <title>青桃</title>
 
     <style>
-      /* —— 预热页（启动瞬间的封面，App 挂载后淡出）—— */
+      /* —— 预热页：一句情话，App 挂载后淡出 —— */
       #splash {
         position: fixed;
         inset: 0;
@@ -31,73 +31,81 @@
       }
       .splash-inner {
         text-align: center;
-        padding-bottom: 6vh;
+        padding: 0 40px;
+        margin-top: -6vh;
       }
-      .splash-ginkgo {
-        width: 54px;
-        color: #98663a;
+      .splash-heart {
+        width: 26px;
+        color: #ad4f38;
       }
-      .splash-title {
-        margin-top: 16px;
+      .splash-quote {
+        max-width: 340px;
+        margin: 18px auto 0;
         font-family: 'Songti SC', 'STSong', 'SimSun', serif;
-        font-size: 46px;
-        font-weight: 700;
-        letter-spacing: 14px;
-        text-indent: 14px;
+        font-size: 27px;
+        line-height: 1.8;
+        letter-spacing: 1px;
         color: #2b251d;
       }
-      .splash-sub {
-        margin-top: 8px;
+      .splash-source {
+        margin-top: 16px;
+        font-family: 'Songti SC', 'STSong', 'SimSun', serif;
+        font-size: 13px;
+        letter-spacing: 1px;
+        color: #897b61;
+      }
+      .splash-sign {
+        position: absolute;
+        left: 0;
+        right: 0;
+        bottom: calc(20px + env(safe-area-inset-bottom));
+        text-align: center;
         font-family: 'Courier New', monospace;
-        font-size: 11px;
-        letter-spacing: 5px;
-        text-indent: 5px;
-        color: #897b61;
-      }
-      .splash-rule {
-        width: 120px;
-        margin: 24px auto 16px;
-        border-top: 1px dashed #c3b189;
-      }
-      .splash-foot {
-        font-family: 'KaiTi', 'STKaiti', '楷体', cursive;
-        font-size: 16px;
-        letter-spacing: 2px;
-        color: #897b61;
+        font-size: 10px;
+        letter-spacing: 4px;
+        color: #b3a588;
       }
     </style>
   </head>
   <body>
-    <!-- 预热封面 -->
+    <!-- 预热封面：一句情话 -->
     <div id="splash">
       <div class="splash-inner">
-        <svg class="splash-ginkgo" viewBox="0 0 60 58" fill="none" aria-hidden="true">
+        <svg class="splash-heart" viewBox="0 0 40 38" fill="none" aria-hidden="true">
           <path
-            d="M30 42 C 20 40 10 30 6 18 Q 12 7 18 11 Q 24 8 30 12 Q 36 8 42 11 Q 48 7 54 18 C 50 30 40 40 30 42 Z"
+            d="M20 34 C 5 23 3 13 10 8 C 15 5 20 10 20 14 C 20 10 25 5 30 8 C 37 13 35 23 20 34 Z"
             stroke="currentColor"
             stroke-width="2.3"
             stroke-linejoin="round"
           />
-          <g stroke="currentColor" stroke-width="1.2" stroke-linecap="round">
-            <path d="M30 41 L9 18" />
-            <path d="M30 41 L18 10" />
-            <path d="M30 41 L24 9" />
-            <path d="M30 41 L30 12" />
-            <path d="M30 41 L36 9" />
-            <path d="M30 41 L42 10" />
-            <path d="M30 41 L51 18" />
-          </g>
-          <path d="M30 42 L30 55" stroke="currentColor" stroke-width="2.3" stroke-linecap="round" />
         </svg>
-        <div class="splash-title">青桃</div>
-        <div class="splash-sub">PRIVATE&nbsp;LETTER</div>
-        <div class="splash-rule"></div>
-        <div class="splash-foot">只属于两个人的信</div>
+        <div class="splash-quote" id="splash-quote">执子之手，与子偕老。</div>
+        <div class="splash-source" id="splash-source">——《诗经·邶风·击鼓》</div>
       </div>
+      <div class="splash-sign">青桃 · PRIVATE LETTER</div>
     </div>
 
     <div id="app"></div>
     <script type="module" src="/src/main.ts"></script>
+    <script>
+      // 每日一句情话：按自然日轮换，两个人同一天看到同一句
+      var QT_QUOTES = [
+        ['执子之手，与子偕老。', '《诗经·邶风·击鼓》'],
+        ['两情若是久长时，又岂在朝朝暮暮。', '秦观《鹊桥仙》'],
+        ['愿得一人心，白首不相离。', '卓文君《白头吟》'],
+        ['只愿君心似我心，定不负相思意。', '李之仪《卜算子》'],
+        ['在天愿作比翼鸟，在地愿为连理枝。', '白居易《长恨歌》'],
+        ['金风玉露一相逢，便胜却人间无数。', '秦观《鹊桥仙》'],
+        ['曾经沧海难为水，除却巫山不是云。', '元稹《离思》'],
+        ['身无彩凤双飞翼，心有灵犀一点通。', '李商隐《无题》'],
+        ['青青子衿，悠悠我心。', '《诗经·郑风·子衿》'],
+        ['一日不见，如三秋兮。', '《诗经·王风·采葛》']
+      ];
+      var QT_DAY = Math.floor(Date.now() / 86400000);
+      var QT_PICK = QT_QUOTES[QT_DAY % QT_QUOTES.length];
+      document.getElementById('splash-quote').textContent = QT_PICK[0];
+      document.getElementById('splash-source').textContent = '——' + QT_PICK[1];
+    </script>
     <script>
       if ('serviceWorker' in navigator) {
         window.addEventListener('load', () => {
