@@ -43,6 +43,7 @@
       ref="deckRef"
       class="deck"
       @touchstart.passive="onTouchStart"
+      @touchmove="onTouchMove"
       @touchend="onTouchEnd"
       @wheel="onWheel"
     >
@@ -90,6 +91,8 @@ const deckRef = ref<HTMLElement | null>(null)
 const W = ref(480)
 // 当前最上层卡片的下标，默认停在最新一张
 const activeIndex = ref(0)
+// 手指拖动时的实时横向偏移（整摞卡片跟手）
+const dragDx = ref(0)
 
 function measure() {
   if (deckRef.value) W.value = deckRef.value.clientWidth
@@ -98,6 +101,8 @@ function measure() {
 /**
  * 计算第 i 张卡片相对当前卡片的层叠姿态。
  * d<0 更早（堆在左），d>0 更新（在右）。
+ * 卡片同尺寸、不缩放（切换无上下/大小跳动），靠透明度与亮度深浅分层：
+ * 当前卡片最亮最实，两侧更暗更透、隐约可见。
  */
 function poseFor(i: number): CSSProperties {
   const d = i - activeIndex.value
@@ -106,20 +111,22 @@ function poseFor(i: number): CSSProperties {
 
   if (abs >= 3) {
     return {
-      transform: `translate(-50%, -50%) translateX(${sign * 0.24 * W.value}px) scale(0.86)`,
+      transform: `translate(-50%, -50%) translateX(${sign * 0.24 * W.value + dragDx.value}px)`,
       opacity: 0,
+      filter: 'brightness(0.6)',
       zIndex: 1,
       pointerEvents: 'none'
     }
   }
 
   const X = (([0, 0.1265, 0.203] as const)[abs] ?? 0) * W.value
-  const scale = ([1, 0.95, 0.9] as const)[abs] ?? 1
-  const opacity = ([1, 0.96, 0.6] as const)[abs] ?? 1
+  const opacity = ([1, 0.5, 0.28] as const)[abs] ?? 1
+  const brightness = ([1, 0.8, 0.66] as const)[abs] ?? 1
 
   return {
-    transform: `translate(-50%, -50%) translateX(${sign * X}px) scale(${scale})`,
+    transform: `translate(-50%, -50%) translateX(${sign * X + dragDx.value}px)`,
     opacity,
+    filter: `brightness(${brightness})`,
     zIndex: 20 - abs
   }
 }
@@ -134,16 +141,47 @@ function next() {
   activeIndex.value = Math.min(orderedEvents.value.length - 1, activeIndex.value + 1)
 }
 
-// 触摸：手指向右滑 -> 看左边更早；向左滑 -> 看右边更新
-let touchX = 0
+// 触摸：卡片实时跟手，抬手吸附；右滑看左边更早，左滑看右边更新
+let startX = 0
+let lastX = 0
+let lastT = 0
+let velocity = 0
+
 function onTouchStart(e: TouchEvent) {
-  touchX = e.touches[0]?.clientX ?? 0
+  const x = e.touches[0]?.clientX ?? 0
+  startX = x
+  lastX = x
+  lastT = Date.now()
+  velocity = 0
+  dragDx.value = 0
 }
-function onTouchEnd(e: TouchEvent) {
-  const dx = (e.changedTouches[0]?.clientX ?? 0) - touchX
-  if (Math.abs(dx) < 40) return
-  if (dx > 0) prev()
-  else next()
+
+function onTouchMove(e: TouchEvent) {
+  const x = e.touches[0]?.clientX ?? 0
+  const now = Date.now()
+  const dt = now - lastT
+  if (dt > 0) velocity = (x - lastX) / dt
+  lastX = x
+  lastT = now
+  dragDx.value = x - startX
+}
+
+function onTouchEnd() {
+  const dist = dragDx.value
+  const fast = Math.abs(velocity) > 0.55
+  let delta = 0
+  // 拖得远翻两页；拖过 10% 宽度，或快速轻扫，就翻一页
+  if (Math.abs(dist) > W.value * 0.26) delta = dist > 0 ? -2 : 2
+  else if (Math.abs(dist) > W.value * 0.1 || (fast && Math.abs(dist) > 12))
+    delta = dist > 0 ? -1 : 1
+
+  const target = Math.min(
+    orderedEvents.value.length - 1,
+    Math.max(0, activeIndex.value + delta)
+  )
+  activeIndex.value = target
+  dragDx.value = 0
+  velocity = 0
 }
 
 // PC 触摸板/鼠标横向滚动切换（带节流）
@@ -293,6 +331,8 @@ onUnmounted(() => window.removeEventListener('resize', measure))
   position: relative;
   height: 392px;
   margin: 0 -20px;
+  /* 纵向交给浏览器滚动页面，横向手势交给 JS 跟手拖动 */
+  touch-action: pan-y;
 }
 
 /* —— 加载骨架 —— */

@@ -83,7 +83,7 @@ const time = computed(() => {
 <style scoped>
 .feed-card {
   position: absolute;
-  top: 50%;
+  top: 46%;
   left: 50%;
   width: var(--card-w);
   margin: 0;
