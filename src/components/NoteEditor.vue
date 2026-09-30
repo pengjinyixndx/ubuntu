@@ -13,41 +13,60 @@
         </button>
       </header>
 
-      <!-- 一张明信片 -->
+      <!-- 一张精致的信 -->
       <div class="paper-wrap">
-        <div class="postcard">
-          <div class="post-top">
-            <!-- 左：贴一张随手拍 -->
-            <div class="post-photo">
-              <button v-if="!photoUrl" type="button" class="photo-empty" @click="picker?.open()">
-                <Plus :size="17" :stroke-width="1.8" />
-                <span>贴张随手拍</span>
+        <div class="letter">
+          <!-- 框框条条 -->
+          <span class="frame frame-a"></span>
+          <span class="frame frame-b"></span>
+
+          <!-- 四角小树枝 -->
+          <svg class="twig twig-tr" viewBox="0 0 96 96" fill="none" aria-hidden="true">
+            <path d="M6 90 C 30 74, 50 56, 72 32" stroke="currentColor" stroke-width="2" stroke-linecap="round" />
+            <g stroke="currentColor" stroke-width="1.5" stroke-linejoin="round">
+              <path d="M72 32 C 60 24, 60 10, 72 2 C 84 10, 84 24, 72 32 Z" fill="currentColor" fill-opacity="0.1" />
+              <path d="M48 56 C 38 50, 36 38, 46 30 C 56 38, 58 50, 48 56 Z" fill="currentColor" fill-opacity="0.1" />
+              <path d="M26 78 C 16 72, 14 60, 24 52 C 34 60, 36 72, 26 78 Z" fill="currentColor" fill-opacity="0.1" />
+            </g>
+          </svg>
+          <svg class="twig twig-bl" viewBox="0 0 96 96" fill="none" aria-hidden="true">
+            <path d="M6 90 C 30 74, 50 56, 72 32" stroke="currentColor" stroke-width="2" stroke-linecap="round" />
+            <g stroke="currentColor" stroke-width="1.5" stroke-linejoin="round">
+              <path d="M72 32 C 60 24, 60 10, 72 2 C 84 10, 84 24, 72 32 Z" fill="currentColor" fill-opacity="0.1" />
+              <path d="M48 56 C 38 50, 36 38, 46 30 C 56 38, 58 50, 48 56 Z" fill="currentColor" fill-opacity="0.1" />
+              <path d="M26 78 C 16 72, 14 60, 24 52 C 34 60, 36 72, 26 78 Z" fill="currentColor" fill-opacity="0.1" />
+            </g>
+          </svg>
+
+          <!-- 火漆印 -->
+          <span class="seal"><em>桃</em></span>
+
+          <!-- 小东西：虚线点缀 -->
+          <span class="dots"></span>
+          <!-- 小东西：一枚小邮票 -->
+          <span class="mini-stamp"><i></i></span>
+
+          <!-- 正文 -->
+          <div class="letter-body">
+            <!-- 随手拍（可不加） -->
+            <button v-if="!photoUrl" type="button" class="photo-empty" @click="picker?.open()">
+              <Plus :size="16" :stroke-width="1.8" />
+              <span>贴张随手拍（可不加）</span>
+            </button>
+            <div v-else class="photo-have">
+              <img :src="photoUrl" alt="随手拍" />
+              <button type="button" class="photo-del" aria-label="删掉照片" @click="clearPhoto">
+                <X :size="12" :stroke-width="2.2" />
               </button>
-              <div v-else class="photo-have">
-                <img :src="photoUrl" alt="随手拍" />
-                <button type="button" class="photo-del" aria-label="删掉照片" @click="clearPhoto">
-                  <X :size="12" :stroke-width="2.2" />
-                </button>
-              </div>
             </div>
 
-            <!-- 右：邮票 + 邮戳（谁写的用谁的票） -->
-            <div class="post-stamps">
-              <span class="postmark">{{ stampDate }}</span>
-              <span class="stamp">
-                <Critter :kind="writerKind" :size="24" still />
-                <em>青桃</em>
-              </span>
-            </div>
+            <textarea
+              ref="taRef"
+              v-model="text"
+              class="writing"
+              :placeholder="placeholder"
+            ></textarea>
           </div>
-
-          <!-- 右下：写着的话 -->
-          <textarea
-            ref="taRef"
-            v-model="text"
-            class="post-msg"
-            :placeholder="placeholder"
-          ></textarea>
         </div>
       </div>
 
@@ -55,13 +74,6 @@
         <span v-if="errMsg" class="foot-err">{{ errMsg }}</span>
         <span v-else class="foot-count">{{ text.length }} 字</span>
       </footer>
-
-      <!-- 桌面边缘小生物 -->
-      <div class="edge-decor" aria-hidden="true">
-        <div class="crawler"><Critter kind="crab" :size="40" /></div>
-        <Critter class="ginkgo g1" kind="ginkgo" :size="34" />
-        <Critter class="ginkgo g2" kind="ginkgo" :size="24" />
-      </div>
 
       <PhotoPicker ref="picker" @picked="onPicked" />
       <PublishFlash v-if="flash" type="note" @done="emit('close')" />
@@ -73,7 +85,6 @@
 import { computed, onMounted, ref } from 'vue'
 import { X, Loader, Plus } from 'lucide-vue-next'
 import { useFeed } from '../composables/useFeed'
-import Critter from './Critter.vue'
 import PhotoPicker from './PhotoPicker.vue'
 import PublishFlash from './PublishFlash.vue'
 
@@ -87,25 +98,12 @@ const flash = ref(false)
 const taRef = ref<HTMLTextAreaElement | null>(null)
 const picker = ref<InstanceType<typeof PhotoPicker> | null>(null)
 
-// 一张随手拍（可选）
 const photo = ref<File | null>(null)
 const photoUrl = ref('')
 
 const canSave = computed(() => (text.value.trim().length > 0 || !!photo.value) && !saving.value)
 const partner = computed(() => (myProfile.value?.gender === 'female' ? '他' : '她'))
 const placeholder = computed(() => `写${partner.value}的话，随手记两句……`)
-
-// 谁写的，邮票上就印谁的符号：他=螃蟹，她=银杏叶
-const writerKind = computed<'crab' | 'ginkgo'>(() =>
-  myProfile.value?.gender === 'female' ? 'ginkgo' : 'crab'
-)
-
-// 邮戳上的日期：2026.09.30
-const stampDate = computed(() => {
-  const d = new Date()
-  const p = (n: number) => String(n).padStart(2, '0')
-  return `${d.getFullYear()}.${p(d.getMonth() + 1)}.${p(d.getDate())}`
-})
 
 function onPicked(files: File[]) {
   const f = files[0]
@@ -231,55 +229,138 @@ onMounted(() => {
   }
 }
 
-/* —— 明信片（横版）—— */
+/* —— 信 —— */
 .paper-wrap {
   flex: 1;
   min-height: 0;
   display: flex;
-  align-items: flex-start;
-  justify-content: center;
-  padding: 22px 14px 0;
+  padding: 16px 14px calc(30px + env(safe-area-inset-bottom));
 }
 
-.postcard {
+.letter {
   position: relative;
-  width: 100%;
-  aspect-ratio: 4 / 3;
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
-  padding: 15px 15px 12px;
+  flex: 1;
+  min-height: 0;
   background-color: var(--photo);
   border: var(--border);
   border-radius: var(--r-sm);
   box-shadow: var(--shadow-card);
-  transform: rotate(-0.7deg);
+  overflow: hidden;
 }
 
-/* 上排：随手拍 + 邮票邮戳 */
-.post-top {
-  flex-shrink: 0;
+/* 框框条条：外实线 + 内虚线 */
+.frame {
+  position: absolute;
+  pointer-events: none;
+}
+.frame-a {
+  inset: 9px;
+  border: 1px solid var(--line-strong);
+}
+.frame-b {
+  inset: 15px;
+  border: 1px dashed var(--line);
+}
+
+/* 四角小树枝 */
+.twig {
+  position: absolute;
+  width: 66px;
+  color: var(--caramel);
+  opacity: 0.85;
+  pointer-events: none;
+}
+.twig-tr {
+  top: 22px;
+  right: 20px;
+}
+.twig-bl {
+  bottom: 22px;
+  left: 20px;
+  transform: rotate(180deg);
+}
+
+/* 火漆印 */
+.seal {
+  position: absolute;
+  top: 30px;
+  left: 50%;
+  width: 46px;
+  height: 46px;
+  margin-left: -23px;
   display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
-  gap: 10px;
-  min-height: 104px;
+  align-items: center;
+  justify-content: center;
+  background-color: var(--brick);
+  border-radius: 50%;
+  box-shadow: inset 0 0 0 2px rgba(253, 250, 241, 0.35);
+  transform: rotate(-8deg);
+}
+.seal em {
+  font-family: var(--font-song);
+  font-size: 20px;
+  font-style: normal;
+  color: var(--photo);
+  opacity: 0.95;
 }
 
-.post-photo {
-  flex: 1 1 auto;
-  max-width: 48%;
-  height: 104px;
+/* 小东西：火漆下一排小点 */
+.dots {
+  position: absolute;
+  top: 88px;
+  left: 50%;
+  width: 58px;
+  margin-left: -29px;
+  border-top: 1.5px dotted var(--line-strong);
 }
 
-.photo-empty {
-  width: 100%;
+/* 小东西：右下角一枚小邮票 */
+.mini-stamp {
+  position: absolute;
+  right: 24px;
+  bottom: 22px;
+  width: 34px;
+  height: 42px;
+  border: 1px solid var(--line-strong);
+  background-color: var(--paper);
+  transform: rotate(4deg);
+}
+.mini-stamp::before {
+  content: '';
+  position: absolute;
+  inset: 3px;
+  border: 1px dashed var(--line);
+}
+.mini-stamp i {
+  position: absolute;
+  left: 50%;
+  top: 46%;
+  width: 12px;
+  height: 12px;
+  margin: -6px 0 0 -6px;
+  border: 1.4px solid var(--caramel);
+  border-radius: 50%;
+}
+
+/* —— 正文区 —— */
+.letter-body {
+  position: relative;
   height: 100%;
   display: flex;
   flex-direction: column;
+  min-height: 0;
+  padding: 96px 38px 96px;
+}
+
+.photo-empty {
+  flex-shrink: 0;
+  display: flex;
   align-items: center;
   justify-content: center;
-  gap: 5px;
+  gap: 6px;
+  width: 100%;
+  height: 62px;
+  margin-bottom: 12px;
   color: var(--faint);
   background-color: transparent;
   border: 1.5px dashed var(--line-strong);
@@ -292,8 +373,9 @@ onMounted(() => {
 
 .photo-have {
   position: relative;
-  width: 100%;
-  height: 100%;
+  flex-shrink: 0;
+  height: 160px;
+  margin-bottom: 12px;
   border: var(--border);
   border-radius: var(--r-sm);
   overflow: hidden;
@@ -320,66 +402,7 @@ onMounted(() => {
   cursor: pointer;
 }
 
-/* —— 邮票 + 邮戳 —— */
-.post-stamps {
-  flex-shrink: 0;
-  display: flex;
-  align-items: center;
-}
-
-/* 邮戳：椭圆、斜压一角，里面带日期 */
-.postmark {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  width: 68px;
-  height: 42px;
-  margin-right: -10px;
-  border: 1.5px solid rgba(173, 79, 56, 0.45);
-  border-radius: 50%;
-  transform: rotate(-14deg);
-  font-family: var(--font-typewriter);
-  font-size: 9px;
-  letter-spacing: 0.5px;
-  color: rgba(173, 79, 56, 0.62);
-  position: relative;
-  z-index: 1;
-}
-
-/* 邮票：小方票 + 齿孔边 + 写的人的符号 */
-.stamp {
-  position: relative;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  gap: 1px;
-  width: 48px;
-  height: 58px;
-  background-color: var(--photo);
-  border: 1px solid var(--line-strong);
-  box-shadow: 0 1px 3px rgba(84, 62, 30, 0.18);
-  transform: rotate(3deg);
-  color: var(--caramel);
-}
-/* 齿孔：内层虚线框 */
-.stamp::before {
-  content: '';
-  position: absolute;
-  inset: 3px;
-  border: 1px dashed var(--line);
-  pointer-events: none;
-}
-.stamp em {
-  font-family: var(--font-song);
-  font-size: 8px;
-  font-style: normal;
-  letter-spacing: 1.5px;
-  color: var(--caramel);
-}
-
-/* —— 写着的话 —— */
-.post-msg {
+.writing {
   flex: 1;
   width: 100%;
   min-height: 0;
@@ -390,17 +413,16 @@ onMounted(() => {
   background-image: linear-gradient(
     to bottom,
     transparent 0,
-    transparent 27px,
-    var(--line) 27px,
-    var(--line) 28px
+    transparent 29px,
+    var(--line) 29px,
+    var(--line) 30px
   );
   font-family: var(--font-song);
-  font-size: var(--fs-md);
-  line-height: 28px;
-  padding-top: 5px;
+  font-size: var(--fs-lg);
+  line-height: 30px;
   color: var(--ink);
 }
-.post-msg::placeholder {
+.writing::placeholder {
   color: var(--faint);
 }
 
@@ -420,42 +442,5 @@ onMounted(() => {
   font-family: var(--font-typewriter);
   font-size: var(--fs-xs);
   color: var(--faint);
-}
-
-/* —— 桌面小生物 —— */
-.edge-decor {
-  position: absolute;
-  inset: 0;
-  pointer-events: none;
-  overflow: hidden;
-}
-.crawler {
-  position: absolute;
-  left: 6px;
-  bottom: calc(48px + env(safe-area-inset-bottom));
-  color: var(--caramel);
-  animation: crawl-drift 22s ease-in-out infinite alternate;
-}
-.ginkgo {
-  position: absolute;
-  color: var(--caramel);
-}
-.ginkgo.g1 {
-  top: calc(50% + 40px);
-  right: 12px;
-  opacity: 0.42;
-}
-.ginkgo.g2 {
-  top: calc(50% + 96px);
-  left: 18px;
-  opacity: 0.26;
-}
-@keyframes crawl-drift {
-  from {
-    transform: translateX(0);
-  }
-  to {
-    transform: translateX(210px);
-  }
 }
 </style>
