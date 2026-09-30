@@ -20,5 +20,12 @@ app.use(router)
 
 app.mount('#app')
 
+// App 挂载完成，淡出预热封面
+const splash = document.getElementById('splash')
+if (splash) {
+  splash.classList.add('fade')
+  window.setTimeout(() => splash.remove(), 500)
+}
+
 // 页面回到前台时预热登录态，避免空闲后第一次操作被 token 续期卡住
 startAuthWarmup()

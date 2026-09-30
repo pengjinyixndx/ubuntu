@@ -6,22 +6,104 @@
     <meta name="theme-color" content="#f3ead4">
     <link rel="icon" href="/favicon.ico">
     <link rel="apple-touch-icon" href="/icons/192.png">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="default">
+    <meta name="apple-mobile-web-app-title" content="青桃">
 
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
     <title>青桃</title>
 
-
+    <style>
+      /* —— 预热页（启动瞬间的封面，App 挂载后淡出）—— */
+      #splash {
+        position: fixed;
+        inset: 0;
+        z-index: 9999;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        background: #f3ead4;
+        transition: opacity 0.45s ease;
+      }
+      #splash.fade {
+        opacity: 0;
+        pointer-events: none;
+      }
+      .splash-inner {
+        text-align: center;
+        padding-bottom: 6vh;
+      }
+      .splash-ginkgo {
+        width: 54px;
+        color: #98663a;
+      }
+      .splash-title {
+        margin-top: 16px;
+        font-family: 'Songti SC', 'STSong', 'SimSun', serif;
+        font-size: 46px;
+        font-weight: 700;
+        letter-spacing: 14px;
+        text-indent: 14px;
+        color: #2b251d;
+      }
+      .splash-sub {
+        margin-top: 8px;
+        font-family: 'Courier New', monospace;
+        font-size: 11px;
+        letter-spacing: 5px;
+        text-indent: 5px;
+        color: #897b61;
+      }
+      .splash-rule {
+        width: 120px;
+        margin: 24px auto 16px;
+        border-top: 1px dashed #c3b189;
+      }
+      .splash-foot {
+        font-family: 'KaiTi', 'STKaiti', '楷体', cursive;
+        font-size: 16px;
+        letter-spacing: 2px;
+        color: #897b61;
+      }
+    </style>
   </head>
-  <script>
-  if ('serviceWorker' in navigator) {
-      window.addEventListener('load', () => {
-      navigator.serviceWorker.register('/sw.js');
-      });
-    }
-  </script>
-
   <body>
+    <!-- 预热封面 -->
+    <div id="splash">
+      <div class="splash-inner">
+        <svg class="splash-ginkgo" viewBox="0 0 60 58" fill="none" aria-hidden="true">
+          <path
+            d="M30 42 C 20 40 10 30 6 18 Q 12 7 18 11 Q 24 8 30 12 Q 36 8 42 11 Q 48 7 54 18 C 50 30 40 40 30 42 Z"
+            stroke="currentColor"
+            stroke-width="2.3"
+            stroke-linejoin="round"
+          />
+          <g stroke="currentColor" stroke-width="1.2" stroke-linecap="round">
+            <path d="M30 41 L9 18" />
+            <path d="M30 41 L18 10" />
+            <path d="M30 41 L24 9" />
+            <path d="M30 41 L30 12" />
+            <path d="M30 41 L36 9" />
+            <path d="M30 41 L42 10" />
+            <path d="M30 41 L51 18" />
+          </g>
+          <path d="M30 42 L30 55" stroke="currentColor" stroke-width="2.3" stroke-linecap="round" />
+        </svg>
+        <div class="splash-title">青桃</div>
+        <div class="splash-sub">PRIVATE&nbsp;LETTER</div>
+        <div class="splash-rule"></div>
+        <div class="splash-foot">只属于两个人的信</div>
+      </div>
+    </div>
+
     <div id="app"></div>
     <script type="module" src="/src/main.ts"></script>
+    <script>
+      if ('serviceWorker' in navigator) {
+        window.addEventListener('load', () => {
+          navigator.serviceWorker.register('/sw.js');
+        });
+      }
+    </script>
   </body>
 </html>
