@@ -2,6 +2,7 @@ import { createRouter, createWebHistory } from 'vue-router'
 import type { RouteRecordRaw } from 'vue-router'
 import MainLayout from '../layouts/MainLayout.vue'
 import { USE_MOCK } from '../lib/dataSource'
+import { ensureAuthReady, session } from '../lib/auth'
 
 const routes: RouteRecordRaw[] = [
   {
@@ -49,26 +50,18 @@ const router = createRouter({
   routes
 })
 
-// 全局前置守卫：使用 Supabase 官方接口校验登录态
-router.beforeEach(async (to, _from, next) => {
+// 全局前置守卫：读内存里的会话镜像，瞬时、零网络、不阻塞切页
+router.beforeEach(async (to) => {
   // 本地演示模式下没有账号体系，直接放行
-  if (USE_MOCK) {
-    next()
-    return
-  }
+  if (USE_MOCK) return true
 
-  // 调用 getUser 获取当前登录用户，自动校验会话有效性
-  const { supabase } = await import('../lib/supabase')
-  const { data: { user } } = await supabase.auth.getUser()
-  const isLoggedIn = !!user
+  // 冷启动首次会等 SDK 从 localStorage 恢复会话；之后都是瞬时
+  await ensureAuthReady()
+  const isLoggedIn = !!session.value
 
-  if (to.meta.requiresAuth && !isLoggedIn) {
-    next('/login')
-  } else if (to.path === '/login' && isLoggedIn) {
-    next('/home')
-  } else {
-    next()
-  }
+  if (to.meta.requiresAuth && !isLoggedIn) return '/login'
+  if (to.path === '/login' && isLoggedIn) return '/home'
+  return true
 })
 
 export default router
