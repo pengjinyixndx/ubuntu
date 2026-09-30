@@ -100,7 +100,7 @@
 
     <!-- 菜单清单 -->
     <section class="menu">
-      <div class="menu-item" @click="showSettings = true">
+      <div class="menu-item">
         <Settings :size="18" :stroke-width="1.5" class="mi-icon" />
         <span class="mi-text">设置</span>
         <ChevronRight :size="18" :stroke-width="1.5" class="mi-arrow" />
@@ -110,13 +110,11 @@
         <span class="mi-text logout">退出登录</span>
       </div>
     </section>
-
-    <SettingsPanel v-if="showSettings" @close="showSettings = false" />
   </div>
 </template>
 
 <script setup lang="ts">
-import { computed, onMounted, ref } from 'vue'
+import { computed, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { supabase } from '../lib/supabase'
 import { Settings, LogOut, ChevronRight, Images, Sparkles, Check } from 'lucide-vue-next'
@@ -125,13 +123,11 @@ import { useFeed } from '../composables/useFeed'
 import { usePetition } from '../composables/usePetition'
 import { USE_MOCK } from '../lib/dataSource'
 import MilkteaCard from '../components/MilkteaCard.vue'
-import SettingsPanel from '../components/SettingsPanel.vue'
 
 const router = useRouter()
 const { events, myProfile, loading, loadEvents } = useFeed()
 const { wishList, kissDebt, loadPetition } = usePetition()
 
-const showSettings = ref(false)
 const days = getTogetherDays()
 const displayName = computed(() => myProfile.value?.display_name || '我的账号')
 const initial = computed(() => displayName.value.trim().charAt(0) || '青')

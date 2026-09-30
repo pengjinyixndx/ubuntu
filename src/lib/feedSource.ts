@@ -11,7 +11,6 @@ import type {
   ConflictNote,
   ConflictStatus,
   CoupleEvent,
-  Gender,
   Kiss,
   MilkteaRequest,
   Profile,
@@ -81,8 +80,4 @@ export interface FeedSource {
     demand: string
   }): Promise<{ error: unknown }>
   setConflictStatus(id: string, status: ConflictStatus): Promise<{ error: unknown }>
-
-  /* —— 设置 —— */
-  /** 改自己的档案（性别 / 昵称） */
-  updateProfile(input: { gender?: Gender; display_name?: string }): Promise<{ error: unknown }>
 }
