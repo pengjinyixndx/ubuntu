@@ -28,7 +28,7 @@
     </div>
 
     <!-- 首次加载骨架 -->
-    <section v-if="loading && !events.length" class="deck">
+    <section v-if="loading && !events.length" class="feed">
       <div class="skeleton-card">
         <div class="sk-line w40"></div>
         <div class="sk-line"></div>
@@ -37,34 +37,58 @@
       </div>
     </section>
 
-    <!-- 堆叠卡片：最新在最上层，更早的在左侧层层叠放 -->
+    <!-- 树枝 + 悬挂卡片：当前居中，两侧露边，左滑看更早 -->
     <section
       v-else-if="events.length && myProfile"
-      ref="deckRef"
-      class="deck"
+      ref="feedRef"
+      class="feed"
+      :class="{ dragging: isDragging }"
       @touchstart.passive="onTouchStart"
       @touchmove="onTouchMove"
       @touchend="onTouchEnd"
+      @touchcancel="onTouchEnd"
       @wheel="onWheel"
     >
-      <EventCard
-        v-for="(ev, i) in orderedEvents"
-        :key="ev.id"
-        :event="ev"
-        :me="myProfile"
-        :current="i === activeIndex"
-        :pose="poseFor(i)"
-        @pick="jumpTo(i)"
-      />
+      <!-- 手绘树枝（横贯顶部） -->
+      <svg class="branch" viewBox="0 0 390 70" preserveAspectRatio="none" aria-hidden="true">
+        <path
+          d="M -5 44 C 70 30, 150 50, 235 44 C 300 40, 350 32, 395 42"
+          stroke="#98663a"
+          stroke-width="3"
+          fill="none"
+          stroke-linecap="round"
+        />
+        <path d="M 120 40 C 132 30, 148 26, 168 22" stroke="#98663a" stroke-width="2" fill="none" stroke-linecap="round" />
+        <path d="M 305 40 C 314 32, 326 28, 342 25" stroke="#98663a" stroke-width="2" fill="none" stroke-linecap="round" />
+        <path d="M 168 22 Q 162 13 168 7 Q 174 13 168 22 Z" fill="#98663a" opacity="0.85" />
+        <path d="M 342 25 Q 337 17 342 11 Q 347 17 342 25 Z" fill="#98663a" opacity="0.85" />
+        <path d="M 28 40 Q 23 33 28 27 Q 33 33 28 40 Z" fill="#c3a06a" opacity="0.8" />
+        <path d="M 262 42 Q 257 35 262 29 Q 267 35 262 42 Z" fill="#c3a06a" opacity="0.8" />
+      </svg>
+
+      <!-- 每张卡片从枝上垂下 -->
+      <div v-for="(ev, i) in events" :key="ev.id" class="hanger" :style="hangerPose(i)">
+        <svg class="stem" viewBox="0 0 30 110" width="30" height="110" aria-hidden="true">
+          <path :d="stemPath(i)" stroke="#98663a" stroke-width="2" fill="none" stroke-linecap="round" />
+          <circle cx="15" cy="3" r="2.6" fill="#98663a" />
+        </svg>
+        <EventCard :event="ev" :me="myProfile" :current="i === activeIndex" @pick="onPick(i)" />
+      </div>
+
+      <!-- 位置指示 -->
+      <div class="indicator"><b>{{ activeIndex + 1 }}</b>&nbsp;/&nbsp;{{ events.length }}</div>
     </section>
 
     <!-- 空状态 -->
-    <section v-else class="deck">
+    <section v-else class="feed">
       <div class="feed-empty">
         <PenLine :size="34" :stroke-width="1.2" class="empty-icon" />
         <span class="empty-text">还没有记录，去「记录」写下第一条吧</span>
       </div>
     </section>
+
+    <!-- 点开看全文 -->
+    <EventDetail v-if="detailEvent && myProfile" :event="detailEvent" :me="myProfile" @close="detailEvent = null" />
   </div>
 </template>
 
@@ -73,75 +97,77 @@ import { computed, onMounted, onUnmounted, ref, type CSSProperties } from 'vue'
 import { PenLine } from 'lucide-vue-next'
 import TopDecor from '../components/TopDecor.vue'
 import EventCard from '../components/EventCard.vue'
+import EventDetail from '../components/EventDetail.vue'
 import { getTogetherDays } from '../composables/useTogether'
 import { getDailyBlessing } from '../composables/useDailyBlessing'
 import { useFeed } from '../composables/useFeed'
+import type { CoupleEvent } from '../types/domain'
 
-// 内置起始日动态计算
 const days = getTogetherDays()
-// 每天轮换一句祝福
 const blessing = getDailyBlessing()
 
 const { events, myProfile, loading, loadEvents } = useFeed()
 
-// 视觉上按时间正序：最左最早、最右最新
-const orderedEvents = computed(() => [...events.value].reverse())
-
-const deckRef = ref<HTMLElement | null>(null)
-const W = ref(480)
-// 当前最上层卡片的下标，默认停在最新一张
+const feedRef = ref<HTMLElement | null>(null)
+const W = ref(390)
+// 当前居中卡片的下标（events 最新在前，0 = 最新）
 const activeIndex = ref(0)
-// 手指拖动时的实时横向偏移（整摞卡片跟手）
 const dragDx = ref(0)
+const isDragging = ref(false)
+const detailEvent = ref<CoupleEvent | null>(null)
 
 function measure() {
-  if (deckRef.value) W.value = deckRef.value.clientWidth
+  if (feedRef.value) W.value = feedRef.value.clientWidth
 }
+
+const clamp = (n: number, lo: number, hi: number) => Math.min(hi, Math.max(lo, n))
+
+// 相邻卡片中心间距（约 0.29W，两侧各露约 70px）
+const step = computed(() => W.value * 0.29)
 
 /**
- * 计算第 i 张卡片相对当前卡片的层叠姿态。
- * d<0 更早（堆在左），d>0 更新（在右）。
- * 卡片同尺寸、不缩放（切换无上下/大小跳动），靠透明度与亮度深浅分层：
- * 当前卡片最亮最实，两侧更暗更透、隐约可见。
+ * 第 i 张卡片的悬挂姿态。
+ * d<0 更新（在左），d>0 更早（在右）。只保留当前 + 左右各一张，其余淡出。
  */
-function poseFor(i: number): CSSProperties {
+function hangerPose(i: number): CSSProperties {
   const d = i - activeIndex.value
   const abs = Math.abs(d)
-  const sign = d < 0 ? -1 : 1
-
-  if (abs >= 3) {
-    return {
-      transform: `translate(-50%, -50%) translateX(${sign * 0.24 * W.value + dragDx.value}px)`,
-      opacity: 0,
-      filter: 'brightness(0.6)',
-      zIndex: 1,
-      pointerEvents: 'none'
-    }
-  }
-
-  const X = (([0, 0.1265, 0.203] as const)[abs] ?? 0) * W.value
-  const opacity = ([1, 0.5, 0.28] as const)[abs] ?? 1
-  const brightness = ([1, 0.8, 0.66] as const)[abs] ?? 1
-
+  const x = d * step.value + dragDx.value
+  const scale = abs === 0 ? 1 : abs === 1 ? 0.64 : 0.5
+  const rot = abs === 0 ? 0 : d < 0 ? -4 : 4
   return {
-    transform: `translate(-50%, -50%) translateX(${sign * X + dragDx.value}px)`,
-    opacity,
-    filter: `brightness(${brightness})`,
-    zIndex: 20 - abs
+    transform: `translateX(${x}px) rotate(${rot}deg) scale(${scale})`,
+    opacity: abs === 0 ? 1 : abs === 1 ? 0.62 : 0,
+    zIndex: 20 - abs,
+    pointerEvents: abs <= 1 ? undefined : 'none'
   }
 }
 
-function jumpTo(i: number) {
-  activeIndex.value = i
+// 垂茎用轻微 S 曲线，偶数/奇数张方向相反，显得更自然（不像一根直线）
+function stemPath(i: number): string {
+  return i % 2 === 0 ? 'M15 2 C 7 32, 23 76, 15 106' : 'M15 2 C 23 32, 7 76, 15 106'
+}
+
+function goTo(i: number) {
+  activeIndex.value = clamp(i, 0, events.value.length - 1)
 }
 function prev() {
-  activeIndex.value = Math.max(0, activeIndex.value - 1)
+  goTo(activeIndex.value - 1)
 }
 function next() {
-  activeIndex.value = Math.min(orderedEvents.value.length - 1, activeIndex.value + 1)
+  goTo(activeIndex.value + 1)
 }
 
-// 触摸：卡片实时跟手，抬手吸附；右滑看左边更早，左滑看右边更新
+/** 点卡片：当前卡片打开全文；两侧露边的卡片先挪到中间 */
+function onPick(i: number) {
+  if (i === activeIndex.value) {
+    detailEvent.value = events.value[i] ?? null
+  } else {
+    goTo(i)
+  }
+}
+
+// —— 触摸：卡片跟手，抬手吸附。手指左滑 = 往前 = 看更早 ——
 let startX = 0
 let lastX = 0
 let lastT = 0
@@ -154,6 +180,7 @@ function onTouchStart(e: TouchEvent) {
   lastT = Date.now()
   velocity = 0
   dragDx.value = 0
+  isDragging.value = true
 }
 
 function onTouchMove(e: TouchEvent) {
@@ -167,32 +194,28 @@ function onTouchMove(e: TouchEvent) {
 }
 
 function onTouchEnd() {
+  isDragging.value = false
   const dist = dragDx.value
-  const fast = Math.abs(velocity) > 0.55
-  let delta = 0
-  // 拖得远翻两页；拖过 10% 宽度，或快速轻扫，就翻一页
-  if (Math.abs(dist) > W.value * 0.26) delta = dist > 0 ? -2 : 2
-  else if (Math.abs(dist) > W.value * 0.1 || (fast && Math.abs(dist) > 12))
-    delta = dist > 0 ? -1 : 1
+  const fast = Math.abs(velocity) > 0.5
+  const shouldFlip = Math.abs(dist) > W.value * 0.12 || (fast && Math.abs(dist) > 8)
 
-  const target = Math.min(
-    orderedEvents.value.length - 1,
-    Math.max(0, activeIndex.value + delta)
-  )
-  activeIndex.value = target
+  let delta = 0
+  if (shouldFlip) delta = dist < 0 ? 1 : -1
+
+  goTo(activeIndex.value + delta)
   dragDx.value = 0
   velocity = 0
 }
 
-// PC 触摸板/鼠标横向滚动切换（带节流）
+// PC 触摸板 / 鼠标横向滚动切换（带节流）
 let lastWheel = 0
 function onWheel(e: WheelEvent) {
-  const delta = Math.abs(e.deltaX) >= Math.abs(e.deltaY) ? e.deltaX : (e.shiftKey ? e.deltaY : 0)
-  if (Math.abs(delta) < 12) return
+  const delta = Math.abs(e.deltaX) >= Math.abs(e.deltaY) ? e.deltaX : e.shiftKey ? e.deltaY : 0
+  if (Math.abs(delta) < 10) return
   const now = Date.now()
-  if (now - lastWheel < 350) return
+  if (now - lastWheel < 320) return
   lastWheel = now
-  if (delta > 0) next()
+  if (delta < 0) next()
   else prev()
 }
 
@@ -200,7 +223,7 @@ onMounted(async () => {
   measure()
   window.addEventListener('resize', measure)
   await loadEvents()
-  activeIndex.value = Math.max(0, orderedEvents.value.length - 1)
+  activeIndex.value = 0
 })
 
 onUnmounted(() => window.removeEventListener('resize', measure))
@@ -219,7 +242,7 @@ onUnmounted(() => window.removeEventListener('resize', measure))
 .days-card {
   position: relative;
   max-width: 320px;
-  margin: 16px auto 0;
+  margin: 14px auto 0;
   background-color: var(--photo);
   border: var(--border);
   border-radius: var(--r-sm);
@@ -245,7 +268,7 @@ onUnmounted(() => window.removeEventListener('resize', measure))
 
 .inner {
   margin: 10px;
-  padding: 18px 16px 16px;
+  padding: 16px 16px 14px;
   border: var(--border-dashed);
   border-radius: var(--r-sm);
   text-align: center;
@@ -263,12 +286,12 @@ onUnmounted(() => window.removeEventListener('resize', measure))
   align-items: baseline;
   justify-content: center;
   gap: 6px;
-  margin: 8px 0;
+  margin: 6px 0;
 }
 
 .days-num {
   font-family: var(--font-serif);
-  font-size: 60px;
+  font-size: 52px;
   font-weight: 700;
   line-height: 1;
   color: var(--ink);
@@ -289,8 +312,8 @@ onUnmounted(() => window.removeEventListener('resize', measure))
 
 /* —— 每日祝福 —— */
 .blessing {
-  margin-top: 14px;
-  padding-top: 12px;
+  margin-top: 12px;
+  padding-top: 10px;
   border-top: 1px dashed var(--line);
 }
 
@@ -298,12 +321,12 @@ onUnmounted(() => window.removeEventListener('resize', measure))
   margin: 0;
   font-family: var(--font-serif);
   font-size: var(--fs-sm);
-  line-height: 1.75;
+  line-height: 1.7;
   color: var(--ink-soft);
 }
 
 .blessing-source {
-  margin: 5px 0 0;
+  margin: 4px 0 0;
   font-family: var(--font-typewriter);
   font-size: var(--fs-xs);
   letter-spacing: 0.5px;
@@ -315,7 +338,7 @@ onUnmounted(() => window.removeEventListener('resize', measure))
   display: flex;
   align-items: center;
   gap: 12px;
-  margin: 26px 0 18px;
+  margin: 18px 0 0;
 }
 
 .divider-line {
@@ -330,15 +353,65 @@ onUnmounted(() => window.removeEventListener('resize', measure))
   color: var(--muted);
 }
 
-/* —— 堆叠卡片容器 —— */
-.deck {
+/* —— 树枝 + 悬挂卡片容器 —— */
+.feed {
   position: relative;
   flex: 1 1 auto;
   min-height: 0;
   margin: 0 -20px;
-  /* 首页固定不纵向滚，横向手势交给 JS 跟手拖动 */
   touch-action: pan-y;
   overflow: hidden;
+}
+
+.branch {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 70px;
+  pointer-events: none;
+}
+
+/* 每张卡片：从枝上垂下，可左右滑动 */
+.hanger {
+  position: absolute;
+  top: 44px;
+  left: 50%;
+  width: var(--card-w);
+  margin-left: calc(var(--card-w) * -0.5);
+  transform-origin: top center;
+  transition:
+    transform 0.42s cubic-bezier(0.22, 0.8, 0.24, 1),
+    opacity 0.3s ease;
+  will-change: transform, opacity;
+}
+
+/* 拖动中禁用过渡，卡片才跟手；松手后再平滑吸附 */
+.feed.dragging .hanger {
+  transition: none;
+}
+
+.stem {
+  display: block;
+  margin: 0 auto;
+}
+
+/* —— 位置指示 —— */
+.indicator {
+  position: absolute;
+  left: 50%;
+  bottom: 8px;
+  transform: translateX(-50%);
+  display: flex;
+  align-items: baseline;
+  font-family: var(--font-typewriter);
+  font-size: var(--fs-xs);
+  color: var(--faint);
+}
+.indicator b {
+  font-size: var(--fs-md);
+  color: var(--caramel);
+  font-weight: 700;
 }
 
 /* —— 加载骨架 —— */

@@ -1,14 +1,9 @@
 <template>
-  <article
-    class="feed-card"
-    :class="{ current }"
-    :style="pose"
-    @click="$emit('pick')"
-  >
+  <article class="feed-card" :class="{ current }" @click="$emit('pick')">
     <!-- 抬头：类型图标 · 称呼 动作 · 时间 -->
     <div class="card-head">
-      <component :is="icon" :size="16" :stroke-width="1.6" class="head-icon" />
-      <span class="head-actor">{{ actor }} · {{ action }}</span>
+      <component :is="icon" :size="15" :stroke-width="1.7" class="head-icon" />
+      <span class="head-actor">{{ actor }} {{ action }}</span>
       <span class="head-time">{{ time }}</span>
     </div>
 
@@ -17,13 +12,10 @@
       <p v-if="isText" class="content-text">{{ event.content }}</p>
 
       <div v-else-if="event.type === 'photo'" class="photo-grid">
-        <img
-          v-for="(url, i) in event.photo_urls"
-          :key="i"
-          :src="url"
-          class="photo-img"
-          alt="照片"
-        />
+        <div v-for="(url, i) in visiblePhotos" :key="i" class="photo-cell">
+          <img :src="url" alt="照片" loading="lazy" @error="onImgError" />
+          <span v-if="i === 2 && restCount > 0" class="photo-more">+{{ restCount }}</span>
+        </div>
       </div>
 
       <div v-else class="ticket-mini">
@@ -31,22 +23,34 @@
         <span>{{ event.content || '奶茶券' }}</span>
       </div>
     </div>
+
+    <!-- 当前卡片且内容过长时，提示可点开看全文 -->
+    <div v-if="current && isText && tooLong" class="more-hint">
+      查看全文
+      <Maximize2 :size="12" :stroke-width="1.8" />
+    </div>
   </article>
 </template>
 
 <script setup lang="ts">
-import { computed, onMounted, onUnmounted, ref, type CSSProperties } from 'vue'
-import { PenLine, BookOpen, Images as ImagesIcon, Ticket, CupSoda, Sparkles } from 'lucide-vue-next'
+import { computed, onMounted, onUnmounted, ref } from 'vue'
+import {
+  PenLine,
+  BookOpen,
+  Images as ImagesIcon,
+  Ticket,
+  CupSoda,
+  Sparkles,
+  Maximize2
+} from 'lucide-vue-next'
 import type { CoupleEvent, Profile } from '../types/domain'
 import { actorLabel, ACTION_LABELS, timeLabel } from '../lib/eventLabels'
 
 const props = defineProps<{
   event: CoupleEvent
   me: Profile
-  /** 是否为最上层的当前卡片 */
+  /** 是否为当前居中的卡片 */
   current: boolean
-  /** 由父组件按层叠关系算好的定位样式 */
-  pose: CSSProperties
 }>()
 
 defineEmits<{ pick: [] }>()
@@ -65,7 +69,14 @@ const actor = computed(() => actorLabel(props.event.actor_id, props.me.id, props
 const action = computed(() => ACTION_LABELS[props.event.type])
 const isText = computed(() => ['note', 'diary', 'wish'].includes(props.event.type))
 
-// 时间每 20 秒重算一次，相对时间（刚刚 / 几分钟前）会自动更新
+// 照片卡片最多预览 3 张，其余折叠成 +N，点开看全部
+const visiblePhotos = computed(() => props.event.photo_urls?.slice(0, 3) ?? [])
+const restCount = computed(() => (props.event.photo_urls?.length ?? 0) - visiblePhotos.value.length)
+
+// 超过约 6 行（约 80 字）就折叠，提示点开看全文
+const tooLong = computed(() => (props.event.content?.length ?? 0) > 80)
+
+// 相对时间每 20 秒重算一次，保持「刚刚 / 几分钟前」准确
 const now = ref(Date.now())
 let timer = 0
 onMounted(() => {
@@ -78,43 +89,43 @@ const time = computed(() => {
   now.value // 建立依赖
   return timeLabel(props.event.created_at)
 })
+
+const PLACEHOLDER =
+  'data:image/svg+xml;utf8,' +
+  encodeURIComponent(
+    `<svg xmlns="http://www.w3.org/2000/svg" width="400" height="300"><rect width="100%" height="100%" fill="#f3ead4"/><g fill="none" stroke="#98663a" stroke-width="2"><rect x="165" y="112" width="70" height="52"/><circle cx="180" cy="128" r="5"/><path d="M165 164 L190 134 L215 164"/></g><text x="200" y="205" font-family="serif" font-size="15" fill="#b3a588" text-anchor="middle">暂无图片</text></svg>`
+  )
+function onImgError(e: Event) {
+  const img = e.currentTarget as HTMLImageElement
+  if (img.src !== PLACEHOLDER) img.src = PLACEHOLDER
+}
 </script>
 
 <style scoped>
 .feed-card {
-  position: absolute;
-  top: 46%;
-  left: 50%;
-  width: var(--card-w);
+  width: 100%;
   margin: 0;
   display: flex;
   flex-direction: column;
-  /* 玻璃相纸：半透明暖白，能透出下面堆叠的卡片，同时保留暖调纸感 */
-  background-color: rgba(253, 250, 241, 0.5);
+  /* 实底相纸：当前卡片完整可读，不再用半透明玻璃 */
+  background-color: var(--photo);
   border: var(--border);
   border-radius: var(--r-md);
   overflow: hidden;
   box-shadow: var(--shadow-card);
-  transform-origin: center center;
-  transition: transform 0.45s cubic-bezier(0.22, 0.78, 0.26, 1),
-    opacity 0.35s ease;
-  will-change: transform, opacity;
   cursor: pointer;
 }
 
-/* 最上层当前卡片：更实、更强阴影、毛玻璃，透过它能看到下面堆叠内容 */
+/* 当前卡片：更强阴影，从两侧露边的卡片中脱颖而出 */
 .feed-card.current {
-  background-color: rgba(253, 250, 241, 0.66);
   box-shadow: var(--shadow-float);
-  backdrop-filter: blur(10px) saturate(1.12);
-  -webkit-backdrop-filter: blur(10px) saturate(1.12);
 }
 
 .card-head {
   display: flex;
   align-items: center;
-  gap: 7px;
-  padding: 12px 14px;
+  gap: 6px;
+  padding: 11px 13px;
   border-bottom: var(--border-dashed);
 }
 
@@ -128,6 +139,8 @@ const time = computed(() => {
   font-size: var(--fs-sm);
   color: var(--ink);
   white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .head-time {
@@ -139,7 +152,7 @@ const time = computed(() => {
 }
 
 .card-content {
-  padding: 14px;
+  padding: 12px 13px;
 }
 
 .content-text {
@@ -151,23 +164,42 @@ const time = computed(() => {
   white-space: pre-wrap;
   word-break: break-word;
   display: -webkit-box;
-  -webkit-line-clamp: 9;
+  -webkit-line-clamp: 6;
   -webkit-box-orient: vertical;
   overflow: hidden;
 }
 
 .photo-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(90px, 1fr));
+  grid-template-columns: repeat(3, 1fr);
   gap: 6px;
 }
 
-.photo-img {
-  width: 100%;
-  height: 110px;
-  object-fit: cover;
+.photo-cell {
+  position: relative;
+  aspect-ratio: 1;
+  overflow: hidden;
   border: var(--border);
   border-radius: var(--r-sm);
+  background-color: var(--paper-deep);
+}
+
+.photo-cell img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.photo-more {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background-color: rgba(43, 37, 29, 0.55);
+  color: var(--photo);
+  font-family: var(--font-typewriter);
+  font-size: var(--fs-md);
 }
 
 .ticket-mini {
@@ -175,11 +207,25 @@ const time = computed(() => {
   align-items: center;
   justify-content: center;
   gap: 8px;
-  padding: 18px;
+  padding: 18px 12px;
   color: var(--brick);
   border: var(--border-dashed);
   border-radius: var(--r-sm);
   font-family: var(--font-song);
   font-size: var(--fs-base);
+}
+
+/* —— 查看全文提示 —— */
+.more-hint {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  padding: 8px;
+  border-top: var(--border-dashed);
+  font-family: var(--font-song);
+  font-size: var(--fs-xs);
+  letter-spacing: 2px;
+  color: var(--caramel);
 }
 </style>
