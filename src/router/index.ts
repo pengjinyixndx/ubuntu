@@ -1,7 +1,7 @@
 import { createRouter, createWebHistory } from 'vue-router'
 import type { RouteRecordRaw } from 'vue-router'
 import MainLayout from '../layouts/MainLayout.vue'
-import { supabase } from '../lib/supabase' // 引入你的 supabase 实例
+import { USE_MOCK } from '../lib/dataSource'
 
 const routes: RouteRecordRaw[] = [
   {
@@ -51,7 +51,14 @@ const router = createRouter({
 
 // 全局前置守卫：使用 Supabase 官方接口校验登录态
 router.beforeEach(async (to, _from, next) => {
+  // 本地演示模式下没有账号体系，直接放行
+  if (USE_MOCK) {
+    next()
+    return
+  }
+
   // 调用 getUser 获取当前登录用户，自动校验会话有效性
+  const { supabase } = await import('../lib/supabase')
   const { data: { user } } = await supabase.auth.getUser()
   const isLoggedIn = !!user
 
