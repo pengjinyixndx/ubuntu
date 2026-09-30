@@ -1,0 +1,199 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <title>相机 / 相册 裸测试</title>
+    <style>
+      * { box-sizing: border-box; }
+      body {
+        margin: 0;
+        padding: 16px;
+        font: 15px/1.7 -apple-system, "PingFang SC", "Microsoft YaHei", sans-serif;
+        background: #f3ead4;
+        color: #2b251d;
+      }
+      h1 { font-size: 18px; margin: 0 0 4px; }
+      .sub { color: #7d7364; font-size: 13px; margin: 0 0 16px; }
+      .card {
+        background: #fdfaf1;
+        border: 1px solid #d7c7a4;
+        border-radius: 6px;
+        padding: 14px;
+        margin-bottom: 14px;
+      }
+      h2 { font-size: 15px; margin: 0 0 10px; }
+      button {
+        display: block;
+        width: 100%;
+        padding: 14px;
+        margin-bottom: 10px;
+        font-size: 16px;
+        color: #fdfaf1;
+        background: #ad4f38;
+        border: 0;
+        border-radius: 5px;
+      }
+      button.gray { background: #98663a; }
+      button:disabled { background: #b3a588; }
+      video { width: 100%; border-radius: 6px; background: #14110d; display: block; }
+      img { width: 100%; border-radius: 6px; margin-top: 10px; display: block; }
+      pre {
+        margin: 0;
+        padding: 10px;
+        min-height: 120px;
+        max-height: 40vh;
+        overflow: auto;
+        font: 12px/1.6 ui-monospace, Menlo, Consolas, monospace;
+        white-space: pre-wrap;
+        word-break: break-all;
+        background: #f0e6cd;
+        border-radius: 5px;
+      }
+      .ok { color: #2f6b3a; }
+      .bad { color: #ad4f38; }
+      label.filebtn {
+        display: block;
+        padding: 14px;
+        margin-bottom: 10px;
+        text-align: center;
+        font-size: 16px;
+        color: #fdfaf1;
+        background: #98663a;
+        border-radius: 5px;
+        position: relative;
+        overflow: hidden;
+      }
+      label.filebtn input {
+        position: absolute;
+        inset: 0;
+        width: 100%;
+        height: 100%;
+        opacity: 0;
+      }
+    </style>
+  </head>
+  <body>
+    <h1>相机 / 相册 裸测试</h1>
+    <p class="sub">这个页面里没有任何青桃的代码，用的就是浏览器最原始的接口。</p>
+
+    <div class="card">
+      <h2>一、环境</h2>
+      <pre id="env">检测中…</pre>
+    </div>
+
+    <div class="card">
+      <h2>二、相机（getUserMedia）</h2>
+      <button id="btnCam">打开相机</button>
+      <button id="btnStop" class="gray" disabled>关掉相机</button>
+      <video id="video" playsinline autoplay muted></video>
+    </div>
+
+    <div class="card">
+      <h2>三、相册（&lt;input type=file&gt;）</h2>
+      <label class="filebtn">
+        从相册选一张
+        <input id="fileAlbum" type="file" accept="image/*" />
+      </label>
+      <label class="filebtn">
+        直接调系统相机（capture）
+        <input id="fileCapture" type="file" accept="image/*" capture="environment" />
+      </label>
+      <img id="preview" alt="" hidden />
+    </div>
+
+    <div class="card">
+      <h2>四、事件日志（时间 / 发生了什么）</h2>
+      <pre id="log"></pre>
+      <button id="btnClear" class="gray" style="margin-top: 10px">清空日志</button>
+    </div>
+
+    <script>
+      var logEl = document.getElementById('log')
+      var t0 = Date.now()
+      function log(msg, bad) {
+        var t = ((Date.now() - t0) / 1000).toFixed(2)
+        logEl.textContent += '[' + t + 's] ' + msg + '\n'
+        logEl.scrollTop = logEl.scrollHeight
+        if (bad) logEl.textContent += ''
+      }
+      window.onerror = function (m) { log('页面报错: ' + m, true) }
+
+      /* ---------- 环境 ---------- */
+      var env = []
+      env.push('地址: ' + location.href)
+      env.push('协议: ' + location.protocol + (location.protocol === 'https:' ? '  ✔ 安全上下文' : '  ✘ 非 HTTPS'))
+      env.push('isSecureContext: ' + window.isSecureContext)
+      env.push('navigator.mediaDevices: ' + (navigator.mediaDevices ? '有' : '没有'))
+      env.push(
+        'getUserMedia: ' + (navigator.mediaDevices && navigator.mediaDevices.getUserMedia ? '有' : '没有')
+      )
+      env.push('UA: ' + navigator.userAgent)
+      env.push('display-mode standalone: ' + (window.matchMedia('(display-mode: standalone)').matches ? '是（装到桌面打开的）' : '否（浏览器标签页）'))
+      document.getElementById('env').textContent = env.join('\n')
+
+      /* ---------- 相机 ---------- */
+      var video = document.getElementById('video')
+      var btnCam = document.getElementById('btnCam')
+      var btnStop = document.getElementById('btnStop')
+      var stream = null
+
+      btnCam.addEventListener('click', function () {
+        log('点了「打开相机」')
+        if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+          log('✘ 这个浏览器根本没有 getUserMedia，相机无解', true)
+          return
+        }
+        btnCam.disabled = true
+        navigator.mediaDevices
+          .getUserMedia({ video: { facingMode: 'environment' }, audio: false })
+          .then(function (s) {
+            stream = s
+            video.srcObject = s
+            var track = s.getVideoTracks()[0]
+            var st = track ? track.getSettings() : {}
+            log('✔ 相机已打开: ' + (st.width || '?') + 'x' + (st.height || '?') + ' 设备=' + (track ? track.label : '?'))
+            btnStop.disabled = false
+          })
+          .catch(function (e) {
+            log('✘ 相机失败  name=' + e.name + '  message=' + e.message, true)
+            btnCam.disabled = false
+          })
+      })
+
+      btnStop.addEventListener('click', function () {
+        if (stream) {
+          stream.getTracks().forEach(function (t) { t.stop() })
+          stream = null
+          video.srcObject = null
+        }
+        btnStop.disabled = true
+        btnCam.disabled = false
+        log('相机已关闭')
+      })
+
+      /* ---------- 相册 ---------- */
+      var preview = document.getElementById('preview')
+      ;['fileAlbum', 'fileCapture'].forEach(function (id) {
+        var el = document.getElementById(id)
+        el.addEventListener('click', function () { log('点了 [' + id + ']（input 收到点击）') })
+        el.addEventListener('change', function () {
+          var f = el.files && el.files[0]
+          if (!f) { log('[' + id + '] change 事件，但没有文件', true); return }
+          log('✔ [' + id + '] 拿到文件: ' + f.name + '  ' + Math.round(f.size / 1024) + 'KB  ' + f.type)
+          var url = URL.createObjectURL(f)
+          preview.src = url
+          preview.hidden = false
+        })
+        el.addEventListener('cancel', function () { log('[' + id + '] cancel 事件（系统没弹或用户取消了）', true) })
+      })
+
+      document.getElementById('btnClear').addEventListener('click', function () {
+        logEl.textContent = ''
+        t0 = Date.now()
+      })
+
+      log('页面已就绪，等你操作')
+    </script>
+  </body>
+</html>
