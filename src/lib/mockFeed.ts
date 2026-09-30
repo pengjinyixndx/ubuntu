@@ -8,6 +8,12 @@
    ============================================================ */
 
 import type { CoupleEvent, Profile } from '../types/domain'
+import {
+  MOCK_PHOTO_BOOK,
+  MOCK_PHOTO_DAISY,
+  MOCK_PHOTO_DUSK,
+  MOCK_PHOTO_TEA
+} from './mockPhotos'
 
 export const MOCK_ME: Profile = {
   id: 'me-0000',
@@ -40,7 +46,7 @@ export const MOCK_EVENTS: CoupleEvent[] = [
     actor_id: MOCK_ME.id,
     type: 'note',
     content: '今天路过那家店，又想起你上次说想喝的那杯，下次一起去。',
-    photo_urls: ['https://images.unsplash.com/photo-1490750967868-88aa4486c946?w=600&q=70'],
+    photo_urls: [MOCK_PHOTO_TEA],
     meta: null,
     created_at: ago(8)
   },
@@ -68,11 +74,7 @@ export const MOCK_EVENTS: CoupleEvent[] = [
     actor_id: MOCK_PARTNER.id,
     type: 'photo',
     content: '窗台上的小雏菊',
-    photo_urls: [
-      'https://images.unsplash.com/photo-1490750967868-88aa4486c946?w=600&q=70',
-      'https://images.unsplash.com/photo-1508610048659-a06b669e3321?w=600&q=70',
-      'https://images.unsplash.com/photo-1465146344425-f00d5f5c8f07?w=600&q=70'
-    ],
+    photo_urls: [MOCK_PHOTO_DAISY, MOCK_PHOTO_BOOK, MOCK_PHOTO_DUSK],
     meta: null,
     created_at: ago(140)
   },
@@ -126,7 +128,7 @@ export const MOCK_EVENTS: CoupleEvent[] = [
     actor_id: MOCK_PARTNER.id,
     type: 'photo',
     content: '傍晚的天空',
-    photo_urls: ['https://images.unsplash.com/photo-1500534314209-a25ddb2bd429?w=600&q=70'],
+    photo_urls: [MOCK_PHOTO_DUSK],
     meta: null,
     created_at: ago(4300)
   }

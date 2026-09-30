@@ -68,6 +68,7 @@
 import { computed, ref } from 'vue'
 import { X, Loader, Plus } from 'lucide-vue-next'
 import { useFeed } from '../composables/useFeed'
+import { shrinkImage, uploadErrorText } from '../lib/image'
 import Critter from './Critter.vue'
 import PhotoPicker from './PhotoPicker.vue'
 import PublishFlash from './PublishFlash.vue'
@@ -104,10 +105,12 @@ async function save() {
 
   const urls: string[] = []
   for (const p of photos.value) {
-    const { url, error } = await uploadPhoto(p.file)
+    // 手机直出的原图太大，逐张压一道再传
+    const small = await shrinkImage(p.file)
+    const { url, error } = await uploadPhoto(small)
     if (error || !url) {
       saving.value = false
-      errMsg.value = '有照片没传上去，再试一次'
+      errMsg.value = uploadErrorText(error)
       return
     }
     urls.push(url)

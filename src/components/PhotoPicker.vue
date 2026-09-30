@@ -2,16 +2,20 @@
   <Teleport to="body">
     <!-- 底部选择：拍照 / 相册 -->
     <transition name="pp">
-      <div v-if="sheetOpen" class="pp-backdrop" @click.self="sheetOpen = false">
+      <div v-if="sheetOpen" class="pp-backdrop" @click.self="close">
         <div class="pp-sheet">
-          <button type="button" class="pp-item" @click="pick('camera')">拍照</button>
-          <button type="button" class="pp-item" @click="pick('album')">从相册选</button>
-          <button type="button" class="pp-item pp-cancel" @click="sheetOpen = false">取消</button>
+          <!-- 用 label 原生关联输入框：微信 / 安卓内置浏览器里也稳定能唤起 -->
+          <label class="pp-item" :for="camId">拍照</label>
+          <label class="pp-item" :for="albId">从相册选</label>
+          <button type="button" class="pp-item pp-cancel" @click="close">取消</button>
         </div>
       </div>
     </transition>
 
+    <!-- 输入框挪到屏幕外，而不是 display:none：
+         部分手机浏览器（微信内置、安卓 WebView）不会响应隐藏输入框 -->
     <input
+      :id="camId"
       ref="camRef"
       class="pp-input"
       type="file"
@@ -20,6 +24,7 @@
       @change="onChange"
     />
     <input
+      :id="albId"
       ref="albRef"
       class="pp-input"
       type="file"
@@ -31,7 +36,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref } from 'vue'
+import { onBeforeUnmount, ref, watch } from 'vue'
 
 const props = withDefaults(
   defineProps<{
@@ -43,36 +48,55 @@ const props = withDefaults(
 
 const emit = defineEmits<{ picked: [files: File[]] }>()
 
+// 每个实例一组独立 id，label 的 for 才能对上
+let seq = 0
+const camId = `qt-pp-cam-${++seq}-${Math.random().toString(36).slice(2, 6)}`
+const albId = `qt-pp-alb-${++seq}-${Math.random().toString(36).slice(2, 6)}`
+
 const sheetOpen = ref(false)
 const camRef = ref<HTMLInputElement | null>(null)
 const albRef = ref<HTMLInputElement | null>(null)
 
-/** 由父组件调用：弹出「拍照 / 从相册选」 */
 function open() {
   sheetOpen.value = true
 }
-
-function pick(which: 'camera' | 'album') {
+function close() {
   sheetOpen.value = false
-  const el = which === 'camera' ? camRef.value : albRef.value
-  if (!el) return
-  el.value = '' // 清空，允许重复选同一张
-  el.click()
 }
+
+/** 从系统选择器回来（拿到图或取消）——窗口重新获得焦点，收起面板 */
+function onReturn() {
+  sheetOpen.value = false
+}
+
+watch(sheetOpen, (isOpen) => {
+  if (isOpen) window.addEventListener('focus', onReturn)
+  else window.removeEventListener('focus', onReturn)
+})
+
+onBeforeUnmount(() => window.removeEventListener('focus', onReturn))
 
 function onChange(e: Event) {
   const input = e.currentTarget as HTMLInputElement
   const files = Array.from(input.files ?? [])
+  input.value = '' // 清空，允许重复选同一张
+  close()
   if (!files.length) return
   emit('picked', props.multiple ? files : files.slice(0, 1))
 }
 
-defineExpose({ open })
+defineExpose({ open, close })
 </script>
 
 <style scoped>
+/* 屏幕外，但保留在布局里（不能 display:none） */
 .pp-input {
-  display: none;
+  position: fixed;
+  left: -10000px;
+  top: 0;
+  width: 1px;
+  height: 1px;
+  opacity: 0;
 }
 
 .pp-backdrop {
@@ -101,12 +125,14 @@ defineExpose({ open })
   font-family: var(--font-song);
   font-size: var(--fs-md);
   letter-spacing: 2px;
+  text-align: center;
   color: var(--ink);
   background-color: var(--photo);
   border: var(--border);
   border-radius: var(--r-sm);
   margin-bottom: 8px;
   cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
 }
 
 .pp-item:last-child {
