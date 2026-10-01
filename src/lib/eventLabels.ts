@@ -27,7 +27,7 @@ function pad2(n: number): string {
   return String(n).padStart(2, '0')
 }
 
-/** 卡片抬头里的短时间：刚刚 / 几分钟前 / 今天 hh:mm / 昨天 hh:mm / 月日 hh:mm / 年.月.日 hh:mm */
+/** 卡片抬头里的短时间：刚刚 / 几分钟前 / 今天 hh:mm / 昨天 hh:mm / 月日 / 年.月.日 */
 export function timeLabel(iso: string): string {
   const d = new Date(iso)
   const now = new Date()
@@ -43,9 +43,8 @@ export function timeLabel(iso: string): string {
   yest.setDate(now.getDate() - 1)
   if (d.toDateString() === yest.toDateString()) return `昨天 ${hm}`
 
-  // 更早的也要精确到几点几分
-  if (d.getFullYear() === now.getFullYear()) return `${d.getMonth() + 1}月${d.getDate()}日 ${hm}`
-  return `${d.getFullYear()}.${d.getMonth() + 1}.${d.getDate()} ${hm}`
+  if (d.getFullYear() === now.getFullYear()) return `${d.getMonth() + 1}月${d.getDate()}日`
+  return `${d.getFullYear()}.${d.getMonth() + 1}.${d.getDate()}`
 }
 
 /** 详情弹层用的完整时间：2026年9月30日 14:23 */
