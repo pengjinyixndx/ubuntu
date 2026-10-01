@@ -12,6 +12,14 @@ const routes: RouteRecordRaw[] = [
     meta: { requiresAuth: false }
   },
   {
+    // 管理后台：独立账号、独立登录，跟两人那套完全不是一个逻辑。
+    // 这里不加 requiresAuth，它的门槛由页面自己把（后台账号标记 is_admin）。
+    path: '/admin',
+    name: 'Admin',
+    component: () => import('../views/AdminPage.vue'),
+    meta: { requiresAuth: false }
+  },
+  {
     path: '/',
     component: MainLayout,
     redirect: '/home',
@@ -52,6 +60,9 @@ const router = createRouter({
 
 // 全局前置守卫：读内存里的会话镜像，瞬时、零网络、不阻塞切页
 router.beforeEach(async (to) => {
+  // 管理后台自成一套，不走这里的登录判断
+  if (to.path.startsWith('/admin')) return true
+
   // 本地演示模式下没有账号体系，直接放行
   if (USE_MOCK) return true
 

@@ -7,6 +7,7 @@
    ============================================================ */
 
 import type {
+  AdminRecord,
   Conflict,
   ConflictNote,
   ConflictStatus,
@@ -18,10 +19,14 @@ import type {
   Wish
 } from '../types/domain'
 import type { FeedSource, LoadResult, PublishInput, Result, UploadResult } from './feedSource'
+import { ADMIN_TABLES, buildAdminRecords } from './adminRecords'
 import { MOCK_EVENTS, MOCK_ME, MOCK_PARTNER } from './mockFeed'
 
 // 复制一份，避免直接改动 mockFeed 里的预置数组
 const store: CoupleEvent[] = [...MOCK_EVENTS]
+
+/** 本地演示里后台是否已登录（真实环境是 Supabase 会话） */
+let adminLoggedIn = false
 
 let seq = 0
 const nid = (p: string) => `${p}-${++seq}`
@@ -126,7 +131,15 @@ function persist() {
   try {
     localStorage.setItem(
       STORAGE_KEY,
-      JSON.stringify({ requests, kisses, wishes, conflicts, conflictNotes })
+      JSON.stringify({
+        requests,
+        kisses,
+        wishes,
+        conflicts,
+        conflictNotes,
+        // 动态本身不持久化（保持演示样例），只记住哪些被后台撤销过
+        revokedEvents: store.filter((e) => e.revoked_at).map((e) => e.id)
+      })
     )
   } catch {
     /* 存不下就算了，不影响使用 */
@@ -144,12 +157,19 @@ function restore() {
       wishes: Wish[]
       conflicts: Conflict[]
       conflictNotes: ConflictNote[]
+      revokedEvents: string[]
     }>
     if (Array.isArray(s.requests)) requests.splice(0, requests.length, ...s.requests)
     if (Array.isArray(s.kisses)) kisses.splice(0, kisses.length, ...s.kisses)
     if (Array.isArray(s.wishes)) wishes.splice(0, wishes.length, ...s.wishes)
     if (Array.isArray(s.conflicts)) conflicts.splice(0, conflicts.length, ...s.conflicts)
     if (Array.isArray(s.conflictNotes)) conflictNotes.splice(0, conflictNotes.length, ...s.conflictNotes)
+    if (Array.isArray(s.revokedEvents)) {
+      for (const id of s.revokedEvents) {
+        const e = store.find((x) => x.id === id)
+        if (e) e.revoked_at = new Date().toISOString()
+      }
+    }
   } catch {
     /* 数据坏了就当没有，用预置的 */
   }
@@ -166,7 +186,10 @@ export const mockSource: FeedSource = {
   },
 
   async listEvents(limit: number): Promise<LoadResult> {
-    const sorted = [...store].sort((a, b) => b.created_at.localeCompare(a.created_at))
+    // 和线上一致：已撤销的记录，普通账号查不到
+    const sorted = store
+      .filter((e) => !e.revoked_at)
+      .sort((a, b) => b.created_at.localeCompare(a.created_at))
     return { data: sorted.slice(0, limit), error: null }
   },
 
@@ -190,7 +213,7 @@ export const mockSource: FeedSource = {
 
   /* —— 奶茶券请求 —— */
   async listMilkteaRequests(): Promise<Result<MilkteaRequest[]>> {
-    return { data: [...requests].sort((a, b) => b.created_at.localeCompare(a.created_at)), error: null }
+    return { data: requests.filter((x) => !x.revoked_at).sort((a, b) => b.created_at.localeCompare(a.created_at)), error: null }
   },
 
   async addMilkteaRequest(input) {
@@ -220,7 +243,7 @@ export const mockSource: FeedSource = {
 
   /* —— 亲亲 —— */
   async listKisses(): Promise<Result<Kiss[]>> {
-    return { data: [...kisses].sort((a, b) => b.created_at.localeCompare(a.created_at)), error: null }
+    return { data: kisses.filter((x) => !x.revoked_at).sort((a, b) => b.created_at.localeCompare(a.created_at)), error: null }
   },
 
   async addKiss(input) {
@@ -260,7 +283,7 @@ export const mockSource: FeedSource = {
 
   /* —— 心愿 —— */
   async listWishes(): Promise<Result<Wish[]>> {
-    return { data: [...wishes].sort((a, b) => b.created_at.localeCompare(a.created_at)), error: null }
+    return { data: wishes.filter((x) => !x.revoked_at).sort((a, b) => b.created_at.localeCompare(a.created_at)), error: null }
   },
 
   async addWish(input) {
@@ -289,7 +312,7 @@ export const mockSource: FeedSource = {
 
   /* —— 矛盾记录 —— */
   async listConflicts(): Promise<Result<Conflict[]>> {
-    return { data: [...conflicts].sort((a, b) => b.created_at.localeCompare(a.created_at)), error: null }
+    return { data: conflicts.filter((x) => !x.revoked_at).sort((a, b) => b.created_at.localeCompare(a.created_at)), error: null }
   },
 
   async startConflict() {
@@ -306,7 +329,7 @@ export const mockSource: FeedSource = {
   },
 
   async listConflictNotes(): Promise<Result<ConflictNote[]>> {
-    return { data: [...conflictNotes], error: null }
+    return { data: conflictNotes.filter((x) => !x.revoked_at), error: null }
   },
 
   async addConflictNote(input) {
@@ -336,6 +359,63 @@ export const mockSource: FeedSource = {
       persist()
     }
     return { error: null }
+  },
+
+  /* ============================================================
+     管理后台（本地演示版）：账号密码随便填，只为把界面跑通
+     ============================================================ */
+  async adminSignIn(email: string, password: string) {
+    if (!email.trim() || !password.trim()) return { error: '请输入账号和密码' }
+    adminLoggedIn = true
+    return { error: null }
+  },
+
+  async adminSignOut() {
+    adminLoggedIn = false
+  },
+
+  async adminCheck() {
+    return adminLoggedIn
+  },
+
+  async adminListAll(): Promise<Result<AdminRecord[]>> {
+    return {
+      data: buildAdminRecords({
+        events: store,
+        requests,
+        kisses,
+        wishes,
+        conflicts,
+        notes: conflictNotes
+      }),
+      error: null
+    }
+  },
+
+  async adminSetRevoked(table: string, id: string, revoked: boolean) {
+    if (!(ADMIN_TABLES as readonly string[]).includes(table)) return { error: '不允许的表' }
+    const at = revoked ? new Date().toISOString() : null
+    const row = store.find((x) => x.id === id && table === 'events') as
+      | { revoked_at?: string | null }
+      | undefined
+    if (row) row.revoked_at = at
+
+    const lists: Record<string, { id: string; revoked_at?: string | null }[]> = {
+      milktea_requests: requests,
+      kisses,
+      wishes,
+      conflicts,
+      conflict_notes: conflictNotes
+    }
+    const hit = lists[table]?.find((x) => x.id === id)
+    if (hit) hit.revoked_at = at
+
+    persist()
+    return { error: null }
+  },
+
+  async adminListProfiles(): Promise<Result<Profile[]>> {
+    return { data: [MOCK_ME, MOCK_PARTNER], error: null }
   }
 }
 

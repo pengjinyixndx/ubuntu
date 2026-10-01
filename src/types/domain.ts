@@ -21,6 +21,8 @@ export interface Profile {
   gender: Gender
   display_name: string | null
   created_at: string
+  /** 是否是管理后台账号（第三个账号）。两人 App 必须把这种账号排除在「对象」之外 */
+  is_admin?: boolean
 }
 
 // 统一动态
@@ -32,10 +34,38 @@ export interface CoupleEvent {
   photo_urls: string[] | null // 照片地址（照片动态可多张）
   meta: Record<string, unknown> | null // 随类型变化的附加结构化数据
   created_at: string
+  /** 被后台撤销的时间；非空则两个普通账号在数据库层面就查不到这条 */
+  revoked_at?: string | null
+}
+
+/* ============================================================
+   管理后台：把六张表拉平成同一种「记录」
+   ============================================================ */
+
+export interface AdminRecord {
+  /** 来源表名 */
+  table: string
+  id: string
+  /** 中文类型名，例如「随笔」「奶茶券请求」 */
+  kind: string
+  /** 产生这条记录的人（user id） */
+  actor: string
+  /** 主要文字内容（各表拼出来的可读摘要） */
+  content: string
+  /** 关联图片（目前只有 events 有） */
+  photos: string[]
+  created_at: string
+  /** null = 正常；有值 = 已被撤销（只有后台看得到） */
+  revoked_at: string | null
+  /** 便于后台在列表里区分主次（例如同一份矛盾的几份记录） */
+  extra?: string
 }
 
 /* ============================================================
    请愿：奶茶券 / 亲亲 / 心愿 / 矛盾记录
+
+   每张表都可能有 revoked_at：由后台填写。
+   非空 = 已被后台撤销，两个普通账号在数据库层面就查不到这条。
    ============================================================ */
 
 /** 奶茶券请求：她发起，他审批（他也可主动发券） */
@@ -48,6 +78,7 @@ export interface MilkteaRequest {
   resolver: string | null
   created_at: string
   resolved_at: string | null
+  revoked_at?: string | null
 }
 
 /** 亲亲：每天免费请求 10 次，超出要对方同意；累积成「欠亲亲」 */
@@ -62,6 +93,7 @@ export interface Kiss {
   resolver: string | null
   created_at: string
   resolved_at: string | null
+  revoked_at?: string | null
 }
 
 /** 心愿：独立表，方便标记完成 */
@@ -73,6 +105,7 @@ export interface Wish {
   done: boolean
   created_at: string
   done_at: string | null
+  revoked_at?: string | null
 }
 
 /** 矛盾：双方各填一份才能进入；吵架期间每次打开弹窗，选冷静 / 和好 */
@@ -83,6 +116,7 @@ export interface Conflict {
   started_by: string
   created_at: string
   updated_at: string
+  revoked_at?: string | null
 }
 
 export interface ConflictNote {
@@ -96,4 +130,5 @@ export interface ConflictNote {
   /** 诉求是什么 */
   demand: string
   created_at: string
+  revoked_at?: string | null
 }

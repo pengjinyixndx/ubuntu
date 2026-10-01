@@ -7,6 +7,7 @@
    ============================================================ */
 
 import type {
+  AdminRecord,
   Conflict,
   ConflictNote,
   ConflictStatus,
@@ -80,4 +81,20 @@ export interface FeedSource {
     demand: string
   }): Promise<{ error: unknown }>
   setConflictStatus(id: string, status: ConflictStatus): Promise<{ error: unknown }>
+
+  /* ============================================================
+     管理后台（第三个账号，独立登录，和上面那套完全隔离）
+     ============================================================ */
+  /** 后台登录：邮箱 + 密码（账号你自己在 Supabase 里建） */
+  adminSignIn(email: string, password: string): Promise<{ error: unknown }>
+  /** 后台退出登录 */
+  adminSignOut(): Promise<void>
+  /** 当前登录者是不是后台账号 */
+  adminCheck(): Promise<boolean>
+  /** 拉全部记录（含已被撤销的） */
+  adminListAll(): Promise<Result<AdminRecord[]>>
+  /** 拉所有账号档案（后台把 user id 显示成人名用） */
+  adminListProfiles(): Promise<Result<Profile[]>>
+  /** 撤销 / 恢复一条记录（打标记，不删行） */
+  adminSetRevoked(table: string, id: string, revoked: boolean): Promise<{ error: unknown }>
 }

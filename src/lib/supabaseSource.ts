@@ -4,6 +4,7 @@
 
 import { supabase } from './supabase'
 import type {
+  AdminRecord,
   Conflict,
   ConflictNote,
   ConflictStatus,
@@ -15,6 +16,7 @@ import type {
   Wish
 } from '../types/domain'
 import type { FeedSource, LoadResult, PublishInput, Result, UploadResult } from './feedSource'
+import { ADMIN_TABLES, buildAdminRecords } from './adminRecords'
 
 /** 图片存储桶名（需在 Supabase 建好，见 supabase/storage.sql） */
 const BUCKET = 'photos'
@@ -49,10 +51,12 @@ export const supabaseSource: FeedSource = {
     const uid = await myId()
     if (!uid) return null
 
+    // 必须排除后台账号，否则两人 App 会把后台账号当成自己的伴侣
     const { data, error } = await supabase
       .from('profiles')
       .select('*')
       .neq('id', uid)
+      .eq('is_admin', false)
       .limit(1)
       .maybeSingle()
 
@@ -261,5 +265,75 @@ export const supabaseSource: FeedSource = {
       .eq('id', id)
     if (error) fail('更新矛盾状态失败', error)
     return { error }
+  },
+
+  /* ============================================================
+     管理后台：独立账号 + 独立登录，和两人那套不共用
+     ============================================================ */
+  async adminSignIn(email: string, password: string): Promise<{ error: unknown }> {
+    const { error } = await supabase.auth.signInWithPassword({ email, password })
+    if (error) fail('后台登录失败', error)
+    return { error }
+  },
+
+  async adminSignOut(): Promise<void> {
+    await supabase.auth.signOut()
+  },
+
+  async adminCheck(): Promise<boolean> {
+    const uid = await myId()
+    if (!uid) return false
+    const { data, error } = await supabase
+      .from('profiles')
+      .select('is_admin')
+      .eq('id', uid)
+      .maybeSingle()
+    if (error) {
+      fail('后台身份校验失败（是否还没跑 supabase/admin.sql？）', error)
+      return false
+    }
+    return !!(data as { is_admin?: boolean } | null)?.is_admin
+  },
+
+  async adminListAll(): Promise<Result<AdminRecord[]>> {
+    const [events, reqs, kisses, wishes, conflicts, notes] = await Promise.all([
+      supabase.from('events').select('*').order('created_at', { ascending: false }).limit(500),
+      supabase.from('milktea_requests').select('*').order('created_at', { ascending: false }).limit(500),
+      supabase.from('kisses').select('*').order('created_at', { ascending: false }).limit(500),
+      supabase.from('wishes').select('*').order('created_at', { ascending: false }).limit(500),
+      supabase.from('conflicts').select('*').order('created_at', { ascending: false }).limit(500),
+      supabase.from('conflict_notes').select('*').order('created_at', { ascending: false }).limit(500)
+    ])
+
+    const firstError =
+      events.error || reqs.error || kisses.error || wishes.error || conflicts.error || notes.error
+    if (firstError) fail('后台读取记录失败', firstError)
+
+    // 后台账号能看到全部（含已撤销），这一点由数据库里的 is_admin() 策略保证
+    const data = buildAdminRecords({
+      events: (events.data ?? []) as CoupleEvent[],
+      requests: (reqs.data ?? []) as MilkteaRequest[],
+      kisses: (kisses.data ?? []) as Kiss[],
+      wishes: (wishes.data ?? []) as Wish[],
+      conflicts: (conflicts.data ?? []) as Conflict[],
+      notes: (notes.data ?? []) as ConflictNote[]
+    })
+    return { data, error: firstError }
+  },
+
+  async adminSetRevoked(table: string, id: string, revoked: boolean): Promise<{ error: unknown }> {
+    if (!(ADMIN_TABLES as readonly string[]).includes(table)) return { error: '不允许的表' }
+    const { error } = await supabase
+      .from(table)
+      .update({ revoked_at: revoked ? new Date().toISOString() : null })
+      .eq('id', id)
+    if (error) fail(`撤销/恢复失败（${table}）`, error)
+    return { error }
+  },
+
+  async adminListProfiles(): Promise<Result<Profile[]>> {
+    const { data, error } = await supabase.from('profiles').select('*')
+    if (error) fail('后台读取档案失败', error)
+    return { data: (data ?? []) as Profile[], error }
   }
 }
