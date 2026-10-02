@@ -34,46 +34,28 @@
     <!-- 她的奶茶卡：本周还能喝几杯（点开看每张券的明细） -->
     <MilkteaCard compact clickable @open="showMilkteaDetail = true" />
 
-    <!-- 照片墙 -->
+    <!-- 照片墙：这里只给个入口 + 最近几张的预览，点开才详细展示 -->
     <section class="section">
       <header class="section-head">
         <h2 class="section-title">照片墙</h2>
         <span class="section-note">共 {{ photos.length }} 张</span>
       </header>
 
-      <div v-if="loading && !photos.length" class="photo-wall">
-        <div v-for="i in 4" :key="'sk-' + i" class="polaroid skeleton"></div>
-      </div>
-
-      <div v-else-if="photos.length" class="photo-wall">
-        <figure
-          v-for="(p, i) in photos"
-          :key="p.id"
-          class="polaroid"
-          :class="tapeSide(i)"
-          :style="{ transform: `rotate(${rotate(i)}deg)` }"
-        >
-          <span class="tape"></span>
-          <div class="polaroid-img">
-            <img :src="p.url" :alt="p.caption || '照片'" loading="lazy" @error="onImgError" />
-          </div>
-          <button
-            type="button"
-            class="polaroid-save"
-            :disabled="savingPhoto === p.id"
-            aria-label="保存到本地"
-            @click.stop="download(p)"
-          >
-            <Download :size="13" :stroke-width="2" />
-          </button>
-          <figcaption v-if="p.caption" class="polaroid-cap">{{ p.caption }}</figcaption>
-        </figure>
-      </div>
-
-      <div v-else class="empty">
-        <Images :size="30" :stroke-width="1.2" class="empty-icon" />
-        <span class="empty-text">还没有照片，去「记录」发第一张吧</span>
-      </div>
+      <button type="button" class="wall-entry" @click="showWall = true">
+        <span class="wall-strip">
+          <span v-for="p in previewPhotos" :key="p.id" class="strip-cell">
+            <img :src="p.url" alt="" loading="lazy" @error="onImgError" />
+          </span>
+          <span v-if="!previewPhotos.length" class="strip-empty">还没有照片</span>
+          <span v-else-if="photos.length > previewPhotos.length" class="strip-more">
+            +{{ photos.length - previewPhotos.length }}
+          </span>
+        </span>
+        <span class="wall-go">
+          查看全部
+          <ChevronRight :size="15" :stroke-width="1.8" />
+        </span>
+      </button>
     </section>
 
     <!-- 心愿单 -->
@@ -122,6 +104,9 @@
 
     <!-- 奶茶券明细 -->
     <MilkteaDetail v-if="showMilkteaDetail" @close="showMilkteaDetail = false" />
+
+    <!-- 照片墙（详细展示） -->
+    <PhotoWall v-if="showWall" @close="showWall = false" />
   </div>
 </template>
 
@@ -129,21 +114,14 @@
 import { computed, onMounted, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { supabase } from '../lib/supabase'
-import {
-  Settings,
-  LogOut,
-  ChevronRight,
-  Images,
-  Sparkles,
-  Check,
-  Download
-} from 'lucide-vue-next'
+import { Settings, LogOut, ChevronRight, Sparkles, Check } from 'lucide-vue-next'
 import { getTogetherDays } from '../composables/useTogether'
 import { useFeed } from '../composables/useFeed'
 import { usePetition } from '../composables/usePetition'
 import { USE_MOCK } from '../lib/dataSource'
 import MilkteaCard from '../components/MilkteaCard.vue'
 import MilkteaDetail from '../components/MilkteaDetail.vue'
+import PhotoWall from '../components/PhotoWall.vue'
 
 const router = useRouter()
 const { events, myProfile, loading, loadEvents } = useFeed()
@@ -186,29 +164,10 @@ const photos = computed<PhotoItem[]>(() => {
   return items
 })
 
-/** 保存到本地：先取回图片再触发下载；跨域取不回来就打开原图让用户长按保存 */
-const savingPhoto = ref('')
-async function download(p: PhotoItem) {
-  savingPhoto.value = p.id
-  try {
-    const res = await fetch(p.url, { mode: 'cors' })
-    if (!res.ok) throw new Error(String(res.status))
-    const blob = await res.blob()
-    const ext = (blob.type.split('/')[1] || 'jpg').replace('jpeg', 'jpg')
-    const href = URL.createObjectURL(blob)
-    const a = document.createElement('a')
-    a.href = href
-    a.download = `青桃-${p.createdAt.slice(0, 10)}-${p.id.slice(-6)}.${ext}`
-    document.body.appendChild(a)
-    a.click()
-    a.remove()
-    setTimeout(() => URL.revokeObjectURL(href), 5000)
-  } catch {
-    window.open(p.url, '_blank')
-  } finally {
-    savingPhoto.value = ''
-  }
-}
+/* 照片墙：这里只放一个入口，点开才是详细展示（保存到本地在弹层里） */
+const showWall = ref(false)
+/** 入口上预览最近 4 张 */
+const previewPhotos = computed(() => photos.value.slice(0, 4))
 
 // 心愿单以请愿页维护的那份为准（可以标记完成）
 const wishes = computed<WishItem[]>(() =>
@@ -230,18 +189,6 @@ function formatWantAt(iso: string): string {
   const d = new Date(`${iso}T00:00:00`)
   if (Number.isNaN(d.getTime())) return iso
   return `${d.getFullYear()}年${d.getMonth() + 1}月${d.getDate()}日`
-}
-
-// —— 照片墙的「手贴」姿态：用下标做稳定的小角度旋转与胶带位置 ——
-const ROTATIONS = [-2.4, 1.7, -1.2, 2.6, -2.9, 1.3, -1.8, 2.2]
-function rotate(i: number): number {
-  return ROTATIONS[i % ROTATIONS.length] ?? 0
-}
-function tapeSide(i: number): string {
-  const mod = i % 3
-  if (mod === 1) return 'tape-left'
-  if (mod === 2) return 'tape-right'
-  return 'tape-center'
 }
 
 /** 图片加载失败时换成暖色占位，避免破图 */
@@ -441,103 +388,69 @@ onMounted(() => {
   color: var(--faint);
 }
 
-/* —— 照片墙 —— */
-.photo-wall {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 18px 12px;
-  padding-top: 6px;
-}
-
-.polaroid {
-  position: relative;
-  margin: 0;
-  padding: 8px 8px 0;
+/* —— 照片墙入口：一排预览 + 查看全部（详细展示在弹层里）—— */
+.wall-entry {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  padding: 12px 13px;
+  text-align: left;
   background-color: var(--photo);
   border: var(--border);
-  border-radius: var(--r-sm);
+  border-radius: var(--r-md);
   box-shadow: var(--shadow-card);
-  transition: transform 0.25s ease;
+  cursor: pointer;
+  transition: transform 0.15s ease;
 }
-.polaroid:active {
-  transform: scale(1.03) !important;
-}
-
-.polaroid .tape {
-  top: -9px;
-  width: 44px;
-  height: 16px;
-  z-index: 1;
-}
-.polaroid.tape-left .tape {
-  left: 12px;
-  transform: rotate(-7deg);
-}
-.polaroid.tape-right .tape {
-  left: auto;
-  right: 12px;
-  transform: rotate(6deg);
-}
-.polaroid.tape-center .tape {
-  left: 50%;
-  transform: translateX(-50%) rotate(-3deg);
+.wall-entry:active {
+  transform: scale(0.985);
 }
 
-.polaroid-img {
-  position: relative;
-  width: 100%;
-  aspect-ratio: 4 / 3;
+.wall-strip {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.strip-cell {
+  flex: 0 0 auto;
+  width: 48px;
+  height: 48px;
   overflow: hidden;
-  background-color: var(--paper-deep);
   border: var(--border);
   border-radius: var(--r-sm);
+  background-color: var(--paper-deep);
 }
-.polaroid-img img {
+.strip-cell img {
   width: 100%;
   height: 100%;
   object-fit: cover;
+  display: block;
 }
-
-/* 保存到本地 */
-.polaroid-save {
-  position: absolute;
-  top: 14px;
-  right: 14px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  width: 24px;
-  height: 24px;
-  color: var(--photo);
-  background-color: rgba(43, 37, 29, 0.5);
-  border: none;
-  border-radius: 50%;
-  cursor: pointer;
-  z-index: 2;
-}
-.polaroid-save:disabled {
-  opacity: 0.5;
-}
-
-.polaroid-cap {
-  margin: 0;
-  padding: 8px 2px 10px;
+.strip-empty {
   font-family: var(--font-hand);
   font-size: var(--fs-sm);
-  line-height: 1.5;
-  color: var(--ink-soft);
-  text-align: center;
-  word-break: break-word;
-  display: -webkit-box;
-  -webkit-line-clamp: 2;
-  -webkit-box-orient: vertical;
-  overflow: hidden;
+  color: var(--faint);
+}
+.strip-more {
+  font-family: var(--font-typewriter);
+  font-size: var(--fs-xs);
+  color: var(--faint);
 }
 
-.polaroid.skeleton {
-  aspect-ratio: 4 / 5;
-  animation: pulse 1.5s ease infinite;
+.wall-go {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  font-family: var(--font-song);
+  font-size: var(--fs-sm);
+  letter-spacing: 1px;
+  color: var(--caramel);
 }
+
 .skeleton-row {
   animation: pulse 1.5s ease infinite;
 }
