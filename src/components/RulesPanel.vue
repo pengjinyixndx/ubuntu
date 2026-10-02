@@ -51,6 +51,26 @@
       </ol>
     </section>
 
+    <section class="block">
+      <h3 class="block-title">心愿</h3>
+      <ol class="rules">
+        <li>许下的心愿会记进时光记录。</li>
+        <li>也可以写上想在什么时候完成。</li>
+        <li>做到以后，在心愿单里打勾就完成了。</li>
+        <li>心愿不会过期，只是一直挂在那里提醒你。</li>
+      </ol>
+    </section>
+
+    <section class="block">
+      <h3 class="block-title">矛盾</h3>
+      <ol class="rules">
+        <li>谁都可以开始一份矛盾记录。</li>
+        <li>两个人都要各写一份：什么时候、因为什么、想要什么。</li>
+        <li>两份都写完才算进入，之后每次打开青桃都会弹出。</li>
+        <li>选「冷静」不算结束，选「和好」才过去；和好后在「我的 → 历史矛盾」回看。</li>
+      </ol>
+    </section>
+
     <MilkteaDetail v-if="showDetail" @close="showDetail = false" />
   </PanelShell>
 </template>

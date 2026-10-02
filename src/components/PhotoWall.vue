@@ -1,8 +1,20 @@
 <template>
   <PanelShell title="照片墙" @close="emit('close')">
-    <p class="lead">
-      一共 {{ photos.length }} 张 · 点开看大图，也可以直接保存到本地
-    </p>
+    <div class="lead-row">
+      <p class="lead">
+        一共 {{ photos.length }} 张 · 点开看大图，也可以直接保存到本地
+      </p>
+      <button
+        v-if="photos.length"
+        type="button"
+        class="btn-save-all"
+        :class="{ done: saveAllState === 'done' }"
+        :disabled="saveAllState === 'saving'"
+        @click="saveAll"
+      >
+        {{ saveAllLabel }}
+      </button>
+    </div>
 
     <p v-if="!photos.length" class="empty">还没有照片，去「记录」发第一张吧</p>
 
@@ -42,7 +54,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, onMounted, ref } from 'vue'
+import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
 import { Download } from 'lucide-vue-next'
 import type { CoupleEvent } from '../types/domain'
 import { useFeed } from '../composables/useFeed'
@@ -85,6 +97,48 @@ async function save(p: PhotoItem) {
   saving.value = ''
 }
 
+/* —— 全部保存：一张一张来，中间隔 400ms，免得浏览器把连着好几次下载挡掉 —— */
+const saveAllState = ref<'idle' | 'saving' | 'done'>('idle')
+const savedCount = ref(0)
+let doneTimer = 0
+let alive = true
+
+const saveAllLabel = computed(() => {
+  if (saveAllState.value === 'saving') return `保存中 ${savedCount.value}/${photos.value.length}`
+  if (saveAllState.value === 'done') return `已保存 ${savedCount.value} 张`
+  return '全部保存'
+})
+
+const wait = (ms: number) => new Promise<void>((resolve) => window.setTimeout(resolve, ms))
+
+async function saveAll() {
+  if (saveAllState.value === 'saving') return
+  const list = photos.value
+  if (!list.length) return
+
+  window.clearTimeout(doneTimer)
+  savedCount.value = 0
+  saveAllState.value = 'saving'
+
+  for (const [i, p] of list.entries()) {
+    await saveImage(p.url, photoFileName(p.createdAt, p.id))
+    if (!alive) return
+    savedCount.value = i + 1
+    if (i < list.length - 1) await wait(400)
+    if (!alive) return
+  }
+
+  saveAllState.value = 'done'
+  doneTimer = window.setTimeout(() => {
+    saveAllState.value = 'idle'
+  }, 3000)
+}
+
+onBeforeUnmount(() => {
+  alive = false
+  window.clearTimeout(doneTimer)
+})
+
 /** 图片加载失败时换成暖色占位，避免破图 */
 const PLACEHOLDER =
   'data:image/svg+xml;utf8,' +
@@ -102,11 +156,43 @@ onMounted(() => {
 </script>
 
 <style scoped>
+.lead-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
 .lead {
+  flex: 1;
+  min-width: 0;
   margin: 0;
   font-family: var(--font-song);
   font-size: var(--fs-xs);
   color: var(--muted);
+}
+
+/* 全部保存：相纸上的小印章，跟奶茶那边的按钮同一套写法 */
+.btn-save-all {
+  flex-shrink: 0;
+  padding: 7px 13px;
+  font-family: var(--font-song);
+  font-size: var(--fs-xs);
+  letter-spacing: 1px;
+  color: var(--photo);
+  background-color: var(--brick);
+  border: 1px solid transparent;
+  border-radius: var(--r-sm);
+  box-shadow: inset 0 0 0 1.5px rgba(253, 250, 241, 0.5);
+  cursor: pointer;
+}
+.btn-save-all:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+.btn-save-all.done {
+  color: var(--caramel);
+  background-color: transparent;
+  border-color: var(--line-strong);
+  box-shadow: none;
 }
 
 .wall {

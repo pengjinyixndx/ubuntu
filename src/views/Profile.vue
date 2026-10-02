@@ -114,6 +114,13 @@
 
     <!-- 菜单清单 -->
     <section class="menu">
+      <!-- 历史矛盾：和好之后的都收在这儿 -->
+      <div class="menu-item" @click="showHistory = true">
+        <BookOpen :size="18" :stroke-width="1.5" class="mi-icon" />
+        <span class="mi-text">历史矛盾</span>
+        <ChevronRight :size="18" :stroke-width="1.5" class="mi-arrow" />
+      </div>
+
       <!-- 恢复：自己删掉的内容 -->
       <div class="menu-item" @click="showRestore = true">
         <RotateCcw :size="18" :stroke-width="1.5" class="mi-icon" />
@@ -143,6 +150,9 @@
 
     <!-- 恢复：自己删掉的内容在这里找回来 -->
     <RestorePanel v-if="showRestore" @close="showRestore = false" />
+
+    <!-- 历史矛盾：和好之后的回看 -->
+    <ConflictHistory v-if="showHistory" @close="showHistory = false" />
   </div>
 </template>
 
@@ -150,7 +160,7 @@
 import { computed, onMounted, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { supabase } from '../lib/supabase'
-import { Settings, LogOut, ChevronRight, Sparkles, Check, RotateCcw } from 'lucide-vue-next'
+import { Settings, LogOut, ChevronRight, Sparkles, Check, RotateCcw, BookOpen } from 'lucide-vue-next'
 import { getTogetherDays } from '../composables/useTogether'
 import { useFeed } from '../composables/useFeed'
 import { usePetition } from '../composables/usePetition'
@@ -160,13 +170,28 @@ import MilkteaDetail from '../components/MilkteaDetail.vue'
 import PhotoWall from '../components/PhotoWall.vue'
 import RulesPanel from '../components/RulesPanel.vue'
 import RestorePanel from '../components/RestorePanel.vue'
+import ConflictHistory from '../components/ConflictHistory.vue'
+import { useMilktea } from '../composables/useMilktea'
 import KissBlock from '../components/KissBlock.vue'
 import { actorLabel } from '../lib/eventLabels'
 
 const router = useRouter()
 const { events, myProfile, loading, loadEvents, resetFeed } = useFeed()
-const { wishList, kissDebt, pendingKisses, pendingRequests, loadPetition, resetPetition } =
+const { wishList, kissDebt, pendingKisses, pendingRequests, conflicts, conflictNotes, loadPetition, resetPetition } =
   usePetition()
+const { vouchers } = useMilktea()
+
+/** 三天内到期、还没用掉的券 */
+const soonVouchers = computed(() => {
+  const soon = Date.now() + 3 * 86400000
+  return vouchers.value.filter(
+    (v) =>
+      !v.usedAt &&
+      !v.expired &&
+      !!v.expiresAt &&
+      new Date(`${v.expiresAt}T23:59:59`).getTime() <= soon
+  )
+})
 
 /* —— 待办：别人递过来、还等他回的事 —— */
 interface Todo {
@@ -182,6 +207,23 @@ const todos = computed<Todo[]>(() => {
   for (const r of pendingRequests.value) {
     out.push({ key: `m${r.id}`, text: `${actorLabel(r.requester, myProfile.value?.id ?? '', myProfile.value?.gender)} 想讨一杯奶茶，等你回`, panel: 'milktea' })
   }
+
+  // 矛盾：还差我那一份
+  const open = conflicts.value.find((c) => c.status !== 'resolved')
+  if (
+    open &&
+    !conflictNotes.value.some(
+      (n) => n.conflict_id === open.id && n.author === myProfile.value?.id
+    )
+  ) {
+    out.push({ key: `c${open.id}`, text: '矛盾记录还差你那一份，去写完', panel: 'conflict' })
+  }
+
+  // 奶茶券快过期（三天内）
+  for (const v of soonVouchers.value) {
+    out.push({ key: `v${v.id}`, text: `${v.expiresAt} 到期的奶茶券，别忘了用`, panel: 'milktea' })
+  }
+
   return out
 })
 function openTodo(t: Todo) {
@@ -191,6 +233,7 @@ function openTodo(t: Todo) {
 const showMilkteaDetail = ref(false)
 const showRules = ref(false)
 const showRestore = ref(false)
+const showHistory = ref(false)
 
 const days = getTogetherDays()
 const displayName = computed(() => myProfile.value?.display_name || '我的账号')

@@ -1,18 +1,22 @@
 <template>
   <Teleport to="body">
-    <div v-if="current" class="ask-mask">
+    <div v-if="currentKiss || currentMilk" class="ask-mask">
       <div class="ask-box">
         <header class="head">
           <Critter kind="ginkgo" :size="22" class="leaf" />
-          <span class="head-text">{{ who(current.requester) }} 想亲你</span>
+          <span class="head-text">{{ currentKiss ? who(currentKiss.requester) + ' 想亲你' : who(currentMilk!.requester) + ' 想讨一杯奶茶' }}</span>
         </header>
 
-        <p v-if="current.reason" class="reason">{{ current.reason }}</p>
-        <div v-if="current.photo_url" class="shot">
-          <img :src="current.photo_url" alt="附的照片" @error="onImgError" />
+        <p v-if="currentKiss ? currentKiss.reason : currentMilk!.reason" class="reason">{{ currentKiss ? currentKiss.reason : currentMilk!.reason }}</p>
+        <div v-if="currentKiss && currentKiss.photo_url" class="shot">
+          <img :src="currentKiss!.photo_url!" alt="附的照片" @error="onImgError" />
         </div>
 
-        <p class="when">{{ time(current.created_at) }}</p>
+        <label v-if="currentMilk" class="expiry">
+          <span>这张券到</span>
+          <input v-model="expiresAt" type="date" />
+        </label>
+        <p class="when">{{ currentKiss ? time(currentKiss.created_at) : time(currentMilk!.created_at) }}</p>
 
         <div class="acts">
           <button type="button" class="btn ghost" :disabled="busy" @click="later">待会儿</button>
@@ -34,12 +38,26 @@ import { computed, ref } from 'vue'
 import { usePetition } from '../composables/usePetition'
 import { useFeed } from '../composables/useFeed'
 import { useMilktea } from '../composables/useMilktea'
-import { actorLabel, timeLabel } from '../lib/eventLabels'
+import { actorLabel, dateTimeLabel, timeLabel } from '../lib/eventLabels'
 import Critter from './Critter.vue'
 
-const { pendingKisses, resolveKiss } = usePetition()
+const { pendingKisses, pendingRequests, resolveKiss, resolveRequest } = usePetition()
 const { myProfile } = useFeed()
 const { iAmHer } = useMilktea()
+
+/** 给她发券要填到期时间，弹层里直接选 */
+const expiresAt = ref(defaultExpiry())
+function defaultExpiry(): string {
+  const d = new Date(Date.now() + 7 * 86400000)
+  const p = (n: number) => String(n).padStart(2, '0')
+  return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}`
+}
+function fmtDay(v: string): string {
+  if (!v) return '没定'
+  const s = dateTimeLabel(`${v}T00:00:00`)
+  const cut = s.indexOf(' ')
+  return cut > 0 ? s.slice(0, cut) : s
+}
 
 const busy = ref(false)
 
@@ -57,10 +75,14 @@ function loadLater(): string[] {
 }
 const dismissed = ref<string[]>(loadLater())
 
-/** 只弹「她递过来、还没回」的那一条 */
-const current = computed(() => {
+/** 只弹「她递过来、还没回」的：亲亲优先，其次奶茶券请愿 */
+const currentKiss = computed(() => {
   if (iAmHer.value) return null
   return pendingKisses.value.find((k) => !dismissed.value.includes(k.id)) ?? null
+})
+const currentMilk = computed(() => {
+  if (iAmHer.value || currentKiss.value) return null
+  return pendingRequests.value.find((r) => !dismissed.value.includes(r.id)) ?? null
 })
 
 function who(id: string): string {
@@ -71,9 +93,9 @@ function time(iso: string): string {
 }
 
 function later() {
-  const target = current.value
-  if (!target) return
-  dismissed.value.push(target.id)
+  const id = currentKiss.value?.id ?? currentMilk.value?.id
+  if (!id) return
+  dismissed.value.push(id)
   try {
     localStorage.setItem(LATER_KEY, JSON.stringify(dismissed.value))
   } catch {
@@ -82,10 +104,13 @@ function later() {
 }
 
 async function answer(status: 'approved' | 'rejected') {
-  const target = current.value
-  if (!target || busy.value) return
+  if (busy.value) return
   busy.value = true
-  await resolveKiss(target.id, status)
+  if (currentKiss.value) {
+    await resolveKiss(currentKiss.value.id, status)
+  } else if (currentMilk.value) {
+    await resolveRequest(currentMilk.value.id, status, { expires_at: expiresAt.value })
+  }
   busy.value = false
 }
 
@@ -163,6 +188,30 @@ function onImgError(e: Event) {
   height: 100%;
   object-fit: cover;
   display: block;
+}
+
+.expiry {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-top: 12px;
+  font-family: var(--font-song);
+  font-size: var(--fs-sm);
+  color: var(--muted);
+}
+.expiry input {
+  flex: 1;
+  padding: 6px 2px;
+  border: none;
+  border-bottom: 1px dashed var(--line-strong);
+  background: transparent;
+  font-family: var(--font-typewriter);
+  font-size: var(--fs-sm);
+  color: var(--ink);
+}
+.expiry input:focus {
+  outline: none;
+  border-bottom-color: var(--caramel);
 }
 
 .when {

@@ -32,10 +32,12 @@
 </template>
 
 <script setup lang="ts">
-import { onMounted, ref } from 'vue'
+import { onMounted, onUnmounted, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { Home, PenLine, HeartHandshake, User } from 'lucide-vue-next'
 import { usePetition } from '../composables/usePetition'
+import { useFeed } from '../composables/useFeed'
+import { subscribeChanges } from '../lib/realtime'
 import ConflictPopup from '../components/ConflictPopup.vue'
 import KissAskModal from '../components/KissAskModal.vue'
 
@@ -43,6 +45,8 @@ const route = useRoute()
 const router = useRouter()
 
 const { needConflictPopup, loadPetition } = usePetition()
+const { loadEvents } = useFeed()
+let unsub: (() => void) | null = null
 const showConflict = ref(false)
 
 const tabs = [
@@ -62,7 +66,15 @@ onMounted(async () => {
   // 每次打开青桃都自查一次：还在吵架期间就弹出来
   await loadPetition()
   if (needConflictPopup.value) showConflict.value = true
+
+  // 实时：对方一发东西，这边立刻刷新（不用等他自己刷新）
+  unsub = subscribeChanges(() => {
+    void loadEvents()
+    void loadPetition()
+  })
 })
+
+onUnmounted(() => unsub?.())
 </script>
 
 <style scoped>
