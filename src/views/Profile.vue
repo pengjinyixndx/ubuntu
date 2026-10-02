@@ -3,7 +3,7 @@
     <!-- 名片：贴上相纸，盖一枚天数印章 -->
     <section class="id-card">
       <span class="tape"></span>
-      <div class="avatar">{{ initial }}</div>
+      <div class="avatar"><Critter :kind="myCritter" :size="34" /></div>
       <div class="id-info">
         <div class="nickname">{{ displayName }}</div>
         <div class="sub">在一起的第 {{ days }} 天</div>
@@ -16,6 +16,8 @@
     </section>
 
     <!-- 数一数一起攒下的东西 -->
+    <RecentStrip :events="events" class="strip-gap" />
+
     <section class="stats">
       <div class="stat">
         <span class="stat-num">{{ photoCount }}</span>
@@ -171,6 +173,8 @@ import PhotoWall from '../components/PhotoWall.vue'
 import RulesPanel from '../components/RulesPanel.vue'
 import RestorePanel from '../components/RestorePanel.vue'
 import ConflictHistory from '../components/ConflictHistory.vue'
+import RecentStrip from '../components/RecentStrip.vue'
+import Critter from '../components/Critter.vue'
 import { useMilktea } from '../composables/useMilktea'
 import KissBlock from '../components/KissBlock.vue'
 import { actorLabel } from '../lib/eventLabels'
@@ -258,6 +262,8 @@ const showHistory = ref(false)
 
 const days = getTogetherDays()
 const displayName = computed(() => myProfile.value?.display_name || '我的账号')
+/** 我是螃蟹还是银杏叶（和首页顶部那两个小家伙同款） */
+const myCritter = computed(() => (myProfile.value?.gender === 'female' ? 'ginkgo' : 'crab'))
 const initial = computed(() => displayName.value.trim().charAt(0) || '青')
 
 // —— 从统一动态里挑出照片与心愿 ——
@@ -581,6 +587,10 @@ onMounted(() => {
   color: var(--caramel);
 }
 
+.strip-gap {
+  margin-top: 14px;
+}
+
 .skeleton-row {
   animation: pulse 1.5s ease infinite;
 }
@@ -687,7 +697,11 @@ onMounted(() => {
   color: var(--caramel);
 }
 
-.wish-item.skeleton-row {
+.wish-item.strip-gap {
+  margin-top: 14px;
+}
+
+.skeleton-row {
   height: 58px;
   border-style: dashed;
 }
