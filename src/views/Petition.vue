@@ -43,6 +43,7 @@ import {
   type LucideIcon
 } from 'lucide-vue-next'
 import { usePetition } from '../composables/usePetition'
+import { useMilktea } from '../composables/useMilktea'
 import MilkteaPanel from '../components/MilkteaPanel.vue'
 import KissPanel from '../components/KissPanel.vue'
 import WishPanel from '../components/WishPanel.vue'
@@ -61,6 +62,8 @@ const {
   openConflict,
   loadPetition
 } = usePetition()
+
+const { iAmHer } = useMilktea()
 
 interface Entry {
   key: Key
@@ -81,10 +84,12 @@ const entries = computed<Entry[]>(() => {
   return [
     {
       key: 'milktea',
-      name: '奶茶券',
+      name: iAmHer.value ? '讨一杯奶茶' : '颁奶茶券',
       desc: pendingRequests.value.length
-        ? `${pendingRequests.value.length} 张等着审批`
-        : '发券、核销，等你审批',
+        ? `${pendingRequests.value.length} 份等着你回`
+        : iAmHer.value
+          ? '跟他说一声想喝什么'
+          : '写清楚因何故和过期时间',
       icon: Ticket,
       badge: pendingRequests.value.length,
       alert: pendingRequests.value.length > 0

@@ -25,7 +25,8 @@
     <NoteEditor v-if="active === 'note'" @close="close" />
     <DiaryEditor v-if="active === 'diary'" @close="close" />
     <PhotoEditor v-if="active === 'photo'" @close="close" />
-    <MilkteaEditor v-if="active === 'milktea'" @close="close" />
+    <!-- 喝奶茶和奶茶券是同一套系统，两个入口都进这里 -->
+    <MilkteaPanel v-if="active === 'milktea'" @close="close" />
   </div>
 </template>
 
@@ -35,7 +36,7 @@ import { PenLine, BookOpen, Images, CupSoda, ChevronRight } from 'lucide-vue-nex
 import NoteEditor from '../components/NoteEditor.vue'
 import DiaryEditor from '../components/DiaryEditor.vue'
 import PhotoEditor from '../components/PhotoEditor.vue'
-import MilkteaEditor from '../components/MilkteaEditor.vue'
+import MilkteaPanel from '../components/MilkteaPanel.vue'
 
 const active = ref('')
 

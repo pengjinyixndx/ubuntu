@@ -18,9 +18,13 @@ export const ACTION_LABELS: Record<EventType, string> = {
   wish: '添加了心愿'
 }
 
-/** 核销奶茶的抬头：用「本周免费」和「奶茶券」说法不同 */
+/**
+ * 喝奶茶的抬头：
+ * - 用券换的 → 核销了奶茶券
+ * - 本周免费额度、以及他自己喝的 → 喝了一杯奶茶
+ */
 export function milkteaAction(source: unknown): string {
-  return source === 'free' ? '喝了一杯奶茶' : '核销了奶茶券'
+  return source === 'voucher' ? '核销了奶茶券' : '喝了一杯奶茶'
 }
 
 function pad2(n: number): string {

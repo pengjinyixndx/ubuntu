@@ -148,6 +148,8 @@ export function useMilktea() {
     flavor?: string
     sweetness?: string
     content?: string
+    /** 这一杯的照片（必填，界面上会校验） */
+    photoUrl?: string
   }): Promise<{ error: unknown }> {
     const source = iAmHer.value ? nextSource.value : 'self'
     if (!source) return { error: 'no-quota' }
@@ -155,6 +157,7 @@ export function useMilktea() {
     return publishEvent({
       type: 'milktea_redeem',
       content: input.content ?? '',
+      photo_urls: input.photoUrl ? [input.photoUrl] : undefined,
       meta: { source, flavor: input.flavor || null, sweetness: input.sweetness || null }
     })
   }

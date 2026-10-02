@@ -30,11 +30,15 @@
           <div v-else-if="isTicket" class="ticket-big">
             <component :is="icon" :size="30" :stroke-width="1.4" />
             <p class="ticket-text">{{ event.content || '奶茶券' }}</p>
-            <p v-if="metaText" class="ticket-meta">{{ metaText }}</p>
+            <p v-if="issueReason" class="ticket-meta">因：{{ issueReason }}</p>
+            <p v-if="issueExpiry" class="ticket-meta">有效期至 {{ issueExpiry }}</p>
           </div>
 
-          <!-- 喝奶茶（核销） -->
+          <!-- 喝奶茶（那一杯的照片 + 口味） -->
           <div v-else-if="isTea">
+            <div v-if="singlePhoto" class="note-photo">
+              <img :src="singlePhoto" alt="这一杯" @error="onImgError" />
+            </div>
             <div v-if="teaChips.length" class="chips">
               <span v-for="c in teaChips" :key="c" class="chip">{{ c }}</span>
             </div>
@@ -104,7 +108,9 @@ const isTicket = computed(() => props.event.type === 'milktea_issue')
 const isTea = computed(() => props.event.type === 'milktea_redeem')
 
 const singlePhoto = computed(() =>
-  props.event.type === 'note' ? (props.event.photo_urls?.[0] ?? '') : ''
+  props.event.type === 'note' || props.event.type === 'milktea_redeem'
+    ? (props.event.photo_urls?.[0] ?? '')
+    : ''
 )
 
 const diaryChips = computed(() => {
@@ -126,6 +132,17 @@ const teaChips = computed(() => {
 const metaText = computed(() => {
   const reason = props.event.meta?.reason
   return typeof reason === 'string' && reason ? reason : ''
+})
+
+// 颁发奶茶券：理由与到期时间分开显示
+const issueReason = computed(() => (props.event.type === 'milktea_issue' ? metaText.value : ''))
+const issueExpiry = computed(() => {
+  if (props.event.type !== 'milktea_issue') return ''
+  const v = props.event.meta?.expires_at
+  if (typeof v !== 'string' || !v) return ''
+  const d = new Date(`${v}T00:00:00`)
+  if (Number.isNaN(d.getTime())) return v
+  return `${d.getFullYear()}年${d.getMonth() + 1}月${d.getDate()}日`
 })
 
 // 心愿的完成时间

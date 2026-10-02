@@ -27,12 +27,15 @@
         </div>
       </div>
 
-      <!-- 喝奶茶（核销） -->
+      <!-- 喝奶茶（核销）：那一杯的照片 + 口味 -->
       <div v-else-if="isTea" class="tea">
         <div v-if="teaChips.length" class="chips">
           <span v-for="c in teaChips" :key="c" class="chip">{{ c }}</span>
         </div>
         <p v-if="event.content" class="content-text">{{ event.content }}</p>
+        <div v-if="singlePhoto" class="note-photo">
+          <img :src="singlePhoto" alt="这一杯" loading="lazy" @error="onImgError" />
+        </div>
       </div>
 
       <!-- 随笔 / 日记 / 心愿 -->
@@ -107,9 +110,11 @@ const isTea = computed(() => props.event.type === 'milktea_redeem')
 const visiblePhotos = computed(() => props.event.photo_urls?.slice(0, 3) ?? [])
 const restCount = computed(() => (props.event.photo_urls?.length ?? 0) - visiblePhotos.value.length)
 
-// 随笔可选的一张随手拍
+// 随笔的随手拍 / 喝奶茶那一杯的照片
 const singlePhoto = computed(() =>
-  props.event.type === 'note' ? (props.event.photo_urls?.[0] ?? '') : ''
+  props.event.type === 'note' || props.event.type === 'milktea_redeem'
+    ? (props.event.photo_urls?.[0] ?? '')
+    : ''
 )
 
 // 日记的天气 / 心情
@@ -255,6 +260,14 @@ function onImgError(e: Event) {
 /* 带照片的卡片撑满可用高度，剩下的空间全给照片 */
 .feed-card.has-photo {
   height: var(--card-max, 260px);
+}
+
+/* —— 喝奶茶：要让里面的照片也能跟着卡片伸缩 —— */
+.tea {
+  flex: 1 1 auto;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
 }
 
 /* —— 小标签（天气/心情、口味/甜度）—— */
