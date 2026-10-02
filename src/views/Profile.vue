@@ -91,7 +91,7 @@
 
     <!-- 菜单清单 -->
     <section class="menu">
-      <div class="menu-item">
+      <div class="menu-item" @click="showRules = true">
         <Settings :size="18" :stroke-width="1.5" class="mi-icon" />
         <span class="mi-text">设置</span>
         <ChevronRight :size="18" :stroke-width="1.5" class="mi-arrow" />
@@ -107,6 +107,9 @@
 
     <!-- 照片墙（详细展示） -->
     <PhotoWall v-if="showWall" @close="showWall = false" />
+
+    <!-- 设置（奶茶规矩都写在这里） -->
+    <RulesPanel v-if="showRules" @close="showRules = false" />
   </div>
 </template>
 
@@ -122,12 +125,14 @@ import { USE_MOCK } from '../lib/dataSource'
 import MilkteaCard from '../components/MilkteaCard.vue'
 import MilkteaDetail from '../components/MilkteaDetail.vue'
 import PhotoWall from '../components/PhotoWall.vue'
+import RulesPanel from '../components/RulesPanel.vue'
 
 const router = useRouter()
 const { events, myProfile, loading, loadEvents } = useFeed()
 const { wishList, kissDebt, loadPetition } = usePetition()
 
 const showMilkteaDetail = ref(false)
+const showRules = ref(false)
 
 const days = getTogetherDays()
 const displayName = computed(() => myProfile.value?.display_name || '我的账号')
