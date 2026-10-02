@@ -153,8 +153,9 @@ import KissBlock from '../components/KissBlock.vue'
 import { actorLabel } from '../lib/eventLabels'
 
 const router = useRouter()
-const { events, myProfile, loading, loadEvents } = useFeed()
-const { wishList, kissDebt, pendingKisses, pendingRequests, loadPetition } = usePetition()
+const { events, myProfile, loading, loadEvents, resetFeed } = useFeed()
+const { wishList, kissDebt, pendingKisses, pendingRequests, loadPetition, resetPetition } =
+  usePetition()
 
 /* —— 待办：别人递过来、还等他回的事 —— */
 interface Todo {
@@ -256,6 +257,9 @@ const handleLogout = async () => {
   if (!USE_MOCK) {
     await supabase.auth.signOut()
   }
+  // 关键：清掉内存里的单例，否则换账号进来还是上一个人的档案
+  resetFeed()
+  resetPetition()
   router.replace('/login')
 }
 

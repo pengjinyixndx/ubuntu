@@ -47,8 +47,12 @@
 import { ref } from 'vue'
 import { supabase } from '../lib/supabase'
 import { useRouter } from 'vue-router'
+import { useFeed } from '../composables/useFeed'
+import { usePetition } from '../composables/usePetition'
 
 const router = useRouter()
+const { resetFeed } = useFeed()
+const { resetPetition } = usePetition()
 const email = ref('')
 const password = ref('')
 const msg = ref('')
@@ -62,6 +66,9 @@ const handleLogin = async () => {
   if (error) {
     msg.value = error.message
   } else {
+    // 换账号登录前先清干净，否则还是上一个人的档案（两个账号会指向同一个人）
+    resetFeed()
+    resetPetition()
     router.push('/')
   }
 }

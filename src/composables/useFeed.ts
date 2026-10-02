@@ -126,6 +126,24 @@ async function saveProfile(patch: {
   return { error: null }
 }
 
+/**
+ * 退出登录 / 换账号时**必须**调一次。
+ * 这个 composable 是模块级单例，登录信息会一直留着，
+ * 不清掉的话换账号进来还是上一个人的档案和动态（两个人会指向同一个账号）。
+ */
+function resetFeed(): void {
+  events.value = []
+  myProfile.value = null
+  partnerProfile.value = null
+  loadError.value = null
+  loading.value = false
+  try {
+    localStorage.removeItem(CACHE_KEY)
+  } catch {
+    /* 忽略 */
+  }
+}
+
 export function useFeed() {
   return {
     events,
@@ -139,6 +157,7 @@ export function useFeed() {
     loadEvents,
     publishEvent,
     uploadPhoto,
-    saveProfile
+    saveProfile,
+    resetFeed
   }
 }

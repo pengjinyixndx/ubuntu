@@ -44,6 +44,19 @@ function isToday(iso: string): boolean {
   )
 }
 
+/**
+ * 退出登录 / 换账号时必须调一次：
+ * 这些也是模块级单例，不清掉的话换个人进来还是上一个人的请愿数据。
+ */
+function resetPetition(): void {
+  requests.value = []
+  kisses.value = []
+  wishes.value = []
+  conflicts.value = []
+  conflictNotes.value = []
+  loading.value = false
+}
+
 export function usePetition() {
   const { myProfile, ensureMe, publishEvent } = useFeed()
 
@@ -301,6 +314,7 @@ export function usePetition() {
     conflicts,
     conflictNotes,
     loading,
+    resetPetition,
     partnerName,
     myId,
     loadPetition,
