@@ -351,10 +351,14 @@ export const supabaseSource: FeedSource = {
   async adminPurge(table: string, id: string): Promise<{ error: unknown }> {
     if (!(ADMIN_TABLES as readonly string[]).includes(table)) return { error: '不允许的表' }
 
-    // events 的图片文件也要一起删，不然桶里会留垃圾
+    // events 和 亲亲请愿 都可能带图片文件，一起删，不然桶里会留垃圾
     if (table === 'events') {
       const { data } = await supabase.from('events').select('photo_urls').eq('id', id).maybeSingle()
       await removePhotos(((data as { photo_urls?: string[] } | null)?.photo_urls ?? []) as string[])
+    } else if (table === 'kisses') {
+      const { data } = await supabase.from('kisses').select('photo_url').eq('id', id).maybeSingle()
+      const url = (data as { photo_url?: string | null } | null)?.photo_url
+      if (url) await removePhotos([url])
     }
 
     const { error } = await supabase.from(table).delete().eq('id', id)
@@ -368,9 +372,17 @@ export const supabaseSource: FeedSource = {
       .select('photo_urls')
       .not('revoked_at', 'is', null)
     if (readErr) fail('读取已撤销照片失败', readErr)
-    await removePhotos(
-      ((evs ?? []) as { photo_urls?: string[] }[]).flatMap((e) => e.photo_urls ?? [])
-    )
+
+    const { data: ks } = await supabase
+      .from('kisses')
+      .select('photo_url')
+      .not('revoked_at', 'is', null)
+    await removePhotos([
+      ...((evs ?? []) as { photo_urls?: string[] }[]).flatMap((e) => e.photo_urls ?? []),
+      ...((ks ?? []) as { photo_url?: string | null }[])
+        .map((k) => k.photo_url)
+        .filter((u): u is string => !!u)
+    ])
 
     let count = 0
     for (const t of ADMIN_TABLES) {
@@ -394,9 +406,14 @@ export const supabaseSource: FeedSource = {
       .select('photo_urls')
       .lt('created_at', iso)
     if (readErr) fail('读取待删照片失败', readErr)
-    await removePhotos(
-      ((evs ?? []) as { photo_urls?: string[] }[]).flatMap((e) => e.photo_urls ?? [])
-    )
+
+    const { data: ks } = await supabase.from('kisses').select('photo_url').lt('created_at', iso)
+    await removePhotos([
+      ...((evs ?? []) as { photo_urls?: string[] }[]).flatMap((e) => e.photo_urls ?? []),
+      ...((ks ?? []) as { photo_url?: string | null }[])
+        .map((k) => k.photo_url)
+        .filter((u): u is string => !!u)
+    ])
 
     let count = 0
     for (const t of ADMIN_TABLES) {

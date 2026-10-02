@@ -107,8 +107,15 @@ export function buildAdminRecords(raw: AdminRawData): AdminRecord[] {
       id: k.id,
       kind: '亲亲',
       actor: k.requester,
-      content: `${k.count} 个 · ${kissStatus(k.status)}${k.redeemed ? ' · 已兑现' : ''}`,
-      photos: [],
+      content: [
+        k.count ? `${k.count} 个` : '1 个',
+        kissStatus(k.status),
+        k.redeemed ? '已兑现' : '',
+        k.reason ? `理由：${k.reason}` : ''
+      ]
+        .filter(Boolean)
+        .join(' · '),
+      photos: k.photo_url ? [k.photo_url] : [],
       created_at: k.created_at,
       revoked_at: k.revoked_at ?? null
     })
