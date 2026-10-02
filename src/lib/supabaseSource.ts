@@ -114,9 +114,14 @@ export const supabaseSource: FeedSource = {
   },
 
   async listEvents(limit: number): Promise<LoadResult> {
+    /* 必须显式排除已撤销的。
+       recycle.sql 把 select 策略放成了「自己的已撤销也可见」（回收站要用），
+       不筛的话——**自己删掉的东西会重新出现在自己的展示流里**。
+       以前是靠策略顺带挡住的，策略一改就露出来了。 */
     const { data, error } = await supabase
       .from('events')
       .select('*')
+      .is('revoked_at', null)
       .order('created_at', { ascending: false })
       .limit(limit)
 
