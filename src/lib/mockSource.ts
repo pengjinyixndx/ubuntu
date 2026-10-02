@@ -25,6 +25,24 @@ import { MOCK_EVENTS, MOCK_ME, MOCK_PARTNER } from './mockFeed'
 // 复制一份，避免直接改动 mockFeed 里的预置数组
 const store: CoupleEvent[] = [...MOCK_EVENTS]
 
+/* 演示用：可以把「我」切成她，方便看另一边的界面
+   在控制台执行 __qtAs('partner') 然后刷新即可；必须是模块最顶部，
+   因为下面的初始化代码就会用到 meId()。 */
+let actingAs: 'me' | 'partner' = 'me'
+try {
+  if (
+    typeof localStorage !== 'undefined' &&
+    localStorage.getItem('qingtao_mock_role') === 'partner'
+  ) {
+    actingAs = 'partner'
+  }
+} catch {
+  /* 忽略 */
+}
+function meId(): string {
+  return actingAs === 'partner' ? MOCK_PARTNER.id : MOCK_ME.id
+}
+
 /** 本地演示里后台是否已登录（真实环境是 Supabase 会话） */
 let adminLoggedIn = false
 
@@ -113,7 +131,7 @@ const wishes: Wish[] = [
   },
   {
     id: 'w-2',
-    owner: MOCK_ME.id,
+    owner: meId(),
     content: '一起把阳台改成小花园。',
     want_at: null,
     done: true,
@@ -132,12 +150,12 @@ function persist() {
     localStorage.setItem(
       STORAGE_KEY,
       JSON.stringify({
+        events: store,
         requests,
         kisses,
         wishes,
         conflicts,
         conflictNotes,
-        // 动态本身不持久化（保持演示样例），只记住哪些被后台撤销过
         revokedEvents: store.filter((e) => e.revoked_at).map((e) => e.id)
       })
     )
@@ -152,6 +170,7 @@ function restore() {
     const raw = localStorage.getItem(STORAGE_KEY)
     if (!raw) return
     const s = JSON.parse(raw) as Partial<{
+      events: CoupleEvent[]
       requests: MilkteaRequest[]
       kisses: Kiss[]
       wishes: Wish[]
@@ -159,6 +178,7 @@ function restore() {
       conflictNotes: ConflictNote[]
       revokedEvents: string[]
     }>
+    if (Array.isArray(s.events)) store.splice(0, store.length, ...s.events)
     if (Array.isArray(s.requests)) requests.splice(0, requests.length, ...s.requests)
     if (Array.isArray(s.kisses)) kisses.splice(0, kisses.length, ...s.kisses)
     if (Array.isArray(s.wishes)) wishes.splice(0, wishes.length, ...s.wishes)
@@ -176,13 +196,14 @@ function restore() {
 }
 restore()
 
+/* 演示用：切换身份（见文件顶部说明） */
 export const mockSource: FeedSource = {
   async getMe(): Promise<Profile | null> {
-    return MOCK_ME
+    return actingAs === 'partner' ? MOCK_PARTNER : MOCK_ME
   },
 
   async getPartner(): Promise<Profile | null> {
-    return MOCK_PARTNER
+    return actingAs === 'partner' ? MOCK_ME : MOCK_PARTNER
   },
 
   async listEvents(limit: number): Promise<LoadResult> {
@@ -196,13 +217,14 @@ export const mockSource: FeedSource = {
   async addEvent(input: PublishInput): Promise<{ error: unknown }> {
     store.push({
       id: nid('local'),
-      actor_id: MOCK_ME.id,
+      actor_id: meId(),
       type: input.type,
       content: input.content ?? null,
       photo_urls: input.photo_urls ?? null,
       meta: input.meta ?? null,
       created_at: new Date().toISOString()
     })
+    persist()
     return { error: null }
   },
 
@@ -219,7 +241,7 @@ export const mockSource: FeedSource = {
   async addMilkteaRequest(input) {
     requests.push({
       id: nid('req'),
-      requester: MOCK_ME.id,
+      requester: meId(),
       reason: input.reason ?? null,
       status: 'pending',
       resolver: null,
@@ -234,7 +256,7 @@ export const mockSource: FeedSource = {
     const r = requests.find((x) => x.id === id)
     if (r) {
       r.status = status
-      r.resolver = MOCK_ME.id
+      r.resolver = meId()
       r.resolved_at = new Date().toISOString()
       persist()
     }
@@ -249,13 +271,15 @@ export const mockSource: FeedSource = {
   async addKiss(input) {
     kisses.push({
       id: nid('k'),
-      requester: MOCK_ME.id,
+      requester: meId(),
       count: input.count ?? 1,
       status: input.free ? 'free' : 'pending',
       redeemed: false,
       resolver: null,
       created_at: new Date().toISOString(),
-      resolved_at: null
+      resolved_at: null,
+      reason: input.reason ?? null,
+      photo_url: input.photoUrl ?? null
     })
     persist()
     return { error: null }
@@ -265,7 +289,7 @@ export const mockSource: FeedSource = {
     const k = kisses.find((x) => x.id === id)
     if (k) {
       k.status = status
-      k.resolver = MOCK_ME.id
+      k.resolver = meId()
       k.resolved_at = new Date().toISOString()
       persist()
     }
@@ -289,7 +313,7 @@ export const mockSource: FeedSource = {
   async addWish(input) {
     wishes.push({
       id: nid('w'),
-      owner: MOCK_ME.id,
+      owner: meId(),
       content: input.content,
       want_at: input.want_at || null,
       done: false,
@@ -320,7 +344,7 @@ export const mockSource: FeedSource = {
     conflicts.push({
       id: nid('cf'),
       status: 'collecting',
-      started_by: MOCK_ME.id,
+      started_by: meId(),
       created_at: new Date().toISOString(),
       updated_at: new Date().toISOString()
     })
@@ -336,7 +360,7 @@ export const mockSource: FeedSource = {
     conflictNotes.push({
       id: nid('cn'),
       conflict_id: input.conflict_id,
-      author: MOCK_ME.id,
+      author: meId(),
       happened_on: input.happened_on ?? null,
       matter: input.matter,
       demand: input.demand,
@@ -493,6 +517,8 @@ declare global {
     __qtSimulatePartnerNote?: (conflictId?: string) => void
     /** 清掉本地演示数据，回到初始样例 */
     __qtResetMock?: () => void
+    /** 演示用：切换「我」是谁（'me' = 他，'partner' = 她），刷新生效 */
+    __qtAs?: (role: 'me' | 'partner') => void
   }
 }
 
@@ -521,6 +547,14 @@ if (typeof window !== 'undefined') {
   window.__qtResetMock = () => {
     try {
       localStorage.removeItem(STORAGE_KEY)
+    } catch {
+      /* 忽略 */
+    }
+  }
+
+  window.__qtAs = (role) => {
+    try {
+      localStorage.setItem('qingtao_mock_role', role)
     } catch {
       /* 忽略 */
     }

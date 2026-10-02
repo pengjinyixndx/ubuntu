@@ -24,6 +24,18 @@
       </ul>
     </section>
 
+    <section class="block">
+      <h3 class="block-title">亲亲</h3>
+      <ol class="rules">
+        <li>她总想亲你，所以「我的」页小螃蟹那格有个「想亲」，每天可以免费点十次。</li>
+        <li>点满十次之后再点，会问要不要去请愿。</li>
+        <li>请愿里写清楚为什么想亲，可以附一张照片。</li>
+        <li>你这边会收到，同意或者拒绝；同意和请求都会记进时光记录。</li>
+        <li>短时间连点好几下，只记一条「想亲 ×n」。</li>
+        <li>没想好就先选「待会儿」，那件事会留在「我的 → 待办」里。</li>
+      </ol>
+    </section>
+
     <MilkteaDetail v-if="showDetail" @close="showDetail = false" />
   </PanelShell>
 </template>

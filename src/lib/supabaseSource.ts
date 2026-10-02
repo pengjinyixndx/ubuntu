@@ -163,7 +163,9 @@ export const supabaseSource: FeedSource = {
     const { error } = await supabase.from('kisses').insert({
       requester: uid,
       count: input.count ?? 1,
-      status: input.free ? 'free' : 'pending'
+      status: input.free ? 'free' : 'pending',
+      reason: input.reason ?? null,
+      photo_url: input.photoUrl ?? null
     })
     if (error) fail('请求亲亲失败', error)
     return { error }

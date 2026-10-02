@@ -31,7 +31,30 @@
       </div>
     </section>
 
-    <!-- 她的奶茶卡：本周还能喝几杯（点开看每张券的明细） -->
+    <!-- 待办：等她等他回的事都摆这儿 -->
+    <section v-if="todos.length" class="section">
+      <header class="section-head">
+        <h2 class="section-title">待办</h2>
+        <span class="section-note">{{ todos.length }} 件</span>
+      </header>
+      <ul class="todo-list">
+        <li v-for="t in todos" :key="t.key" class="todo" @click="openTodo(t)">
+          <span class="todo-dot"></span>
+          <span class="todo-text">{{ t.text }}</span>
+          <ChevronRight :size="16" :stroke-width="1.6" class="todo-arrow" />
+        </li>
+      </ul>
+    </section>
+
+    <!-- 亲亲：两个人都摆出来，想亲在小螃蟹那格 -->
+    <section class="section">
+      <header class="section-head">
+        <h2 class="section-title">亲亲</h2>
+      </header>
+      <KissBlock />
+    </section>
+
+    <!-- 奶茶卡：本周还能喝几杯（点开看每张券的明细） -->
     <MilkteaCard compact clickable @open="showMilkteaDetail = true" />
 
     <!-- 照片墙：这里只给个入口 + 最近几张的预览，点开才详细展示 -->
@@ -126,10 +149,32 @@ import MilkteaCard from '../components/MilkteaCard.vue'
 import MilkteaDetail from '../components/MilkteaDetail.vue'
 import PhotoWall from '../components/PhotoWall.vue'
 import RulesPanel from '../components/RulesPanel.vue'
+import KissBlock from '../components/KissBlock.vue'
+import { actorLabel } from '../lib/eventLabels'
 
 const router = useRouter()
 const { events, myProfile, loading, loadEvents } = useFeed()
-const { wishList, kissDebt, loadPetition } = usePetition()
+const { wishList, kissDebt, pendingKisses, pendingRequests, loadPetition } = usePetition()
+
+/* —— 待办：别人递过来、还等他回的事 —— */
+interface Todo {
+  key: string
+  text: string
+  panel: string
+}
+const todos = computed<Todo[]>(() => {
+  const out: Todo[] = []
+  for (const k of pendingKisses.value) {
+    out.push({ key: `k${k.id}`, text: `${actorLabel(k.requester, myProfile.value?.id ?? '', myProfile.value?.gender)} 想亲你，等你的回话`, panel: 'kiss' })
+  }
+  for (const r of pendingRequests.value) {
+    out.push({ key: `m${r.id}`, text: `${actorLabel(r.requester, myProfile.value?.id ?? '', myProfile.value?.gender)} 想讨一杯奶茶，等你回`, panel: 'milktea' })
+  }
+  return out
+})
+function openTodo(t: Todo) {
+  router.push({ path: '/petition', query: { panel: t.panel } })
+}
 
 const showMilkteaDetail = ref(false)
 const showRules = ref(false)
@@ -458,6 +503,49 @@ onMounted(() => {
 
 .skeleton-row {
   animation: pulse 1.5s ease infinite;
+}
+
+/* —— 待办 —— */
+.todo-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.todo {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  padding: 12px 13px;
+  background-color: var(--photo);
+  border: var(--border);
+  border-radius: var(--r-sm);
+  box-shadow: var(--shadow-card);
+  cursor: pointer;
+}
+.todo:active {
+  transform: scale(0.988);
+}
+.todo-dot {
+  flex-shrink: 0;
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background-color: var(--brick);
+  animation: pulse 1.8s ease infinite;
+}
+.todo-text {
+  flex: 1;
+  min-width: 0;
+  font-family: var(--font-song);
+  font-size: var(--fs-sm);
+  color: var(--ink);
+}
+.todo-arrow {
+  flex-shrink: 0;
+  color: var(--faint);
 }
 
 /* —— 心愿单 —— */

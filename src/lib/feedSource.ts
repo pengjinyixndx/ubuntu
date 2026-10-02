@@ -61,7 +61,13 @@ export interface FeedSource {
 
   /* —— 请愿 · 亲亲 —— */
   listKisses(): Promise<Result<Kiss[]>>
-  addKiss(input: { count?: number; free: boolean }): Promise<{ error: unknown }>
+  addKiss(input: {
+    count?: number
+    free: boolean
+    /** 请愿亲亲才写理由和照片 */
+    reason?: string
+    photoUrl?: string
+  }): Promise<{ error: unknown }>
   resolveKiss(id: string, status: 'approved' | 'rejected'): Promise<{ error: unknown }>
   redeemKiss(id: string): Promise<{ error: unknown }>
 

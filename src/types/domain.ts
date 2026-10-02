@@ -12,7 +12,9 @@ export type EventType =
   | 'photo' // 照片
   | 'milktea_issue' // 颁发奶茶券（他给她）
   | 'milktea_redeem' // 核销奶茶券 / 喝奶茶
+  | 'milktea_request' // 她递过来的奶茶券请愿（不算券）
   | 'wish' // 添加心愿
+  | 'kiss' // 想亲 / 请愿亲亲 / 答应亲亲
 
 // 账号档案：auth.users 的扩展，补充性别
 export interface Profile {
@@ -93,6 +95,10 @@ export interface Kiss {
   resolver: string | null
   created_at: string
   resolved_at: string | null
+  /** 请愿亲亲时写的理由（「想亲」直接点的那种不写） */
+  reason?: string | null
+  /** 请愿亲亲可以附一张照片 */
+  photo_url?: string | null
   revoked_at?: string | null
 }
 

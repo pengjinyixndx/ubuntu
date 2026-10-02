@@ -78,8 +78,11 @@ export function usePetition() {
   async function requestMilktea(reason: string) {
     const src = await getFeedSource()
     const { error } = await src.addMilkteaRequest({ reason })
-    if (!error) await loadPetition()
-    return { error }
+    if (error) return { error }
+    // 请愿本身也进时光记录；它不算券，所以用 milktea_request
+    await publishEvent({ type: 'milktea_request', content: reason, meta: { reason } })
+    await loadPetition()
+    return { error: null }
   }
 
   /** 审批：同意时会真的发一张券（写一条 milktea_issue 动态，券余额才算得上） */
@@ -145,20 +148,52 @@ export function usePetition() {
     kisses.value.filter((k) => k.status === 'pending' && k.requester === myId.value)
   )
 
-  /** 请求亲亲：额度内自动算，超出挂起等对方同意 */
+  /** 「想亲」：免费额度内直接算；短时间点好几下会合并成一条「想亲 ×n」 */
   async function askKiss(count = 1) {
     const src = await getFeedSource()
-    const free = freeLeftToday.value >= count
-    const { error } = await src.addKiss({ count, free })
-    if (!error) await loadPetition()
-    return { error, free }
+    const n = Math.min(count, Math.max(0, freeLeftToday.value))
+    if (n <= 0) return { error: 'no-quota', free: false }
+
+    const { error } = await src.addKiss({ count: n, free: true })
+    if (error) return { error, free: true }
+
+    await publishEvent({ type: 'kiss', content: '', meta: { kind: 'ask', count: n } })
+    await loadPetition()
+    return { error: null, free: true }
+  }
+
+  /** 请愿亲亲：写清楚为什么想亲，可以附一张照片 */
+  async function requestKiss(reason: string, photoUrl?: string) {
+    const src = await getFeedSource()
+    const { error } = await src.addKiss({ count: 1, free: false, reason, photoUrl })
+    if (error) return { error }
+
+    await publishEvent({
+      type: 'kiss',
+      content: reason,
+      photo_urls: photoUrl ? [photoUrl] : undefined,
+      meta: { kind: 'request', count: 1, reason, photo_url: photoUrl ?? null }
+    })
+    await loadPetition()
+    return { error: null }
   }
 
   async function resolveKiss(id: string, status: 'approved' | 'rejected') {
     const src = await getFeedSource()
+    const target = kisses.value.find((k) => k.id === id)
     const { error } = await src.resolveKiss(id, status)
-    if (!error) await loadPetition()
-    return { error }
+    if (error) return { error }
+
+    // 答应了也记一条；拒绝不记（拒了就不是好事，不用留在记录里）
+    if (status === 'approved') {
+      await publishEvent({
+        type: 'kiss',
+        content: '',
+        meta: { kind: 'granted', count: target?.count ?? 1 }
+      })
+    }
+    await loadPetition()
+    return { error: null }
   }
 
   async function redeemKiss(id: string) {
@@ -284,6 +319,7 @@ export function usePetition() {
     pendingKisses,
     myPendingKisses,
     askKiss,
+    requestKiss,
     resolveKiss,
     redeemKiss,
 

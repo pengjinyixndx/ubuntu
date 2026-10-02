@@ -15,7 +15,18 @@ export const ACTION_LABELS: Record<EventType, string> = {
   photo: '发了照片',
   milktea_issue: '颁发了奶茶券',
   milktea_redeem: '核销了奶茶券',
-  wish: '添加了心愿'
+  milktea_request: '想讨一杯奶茶',
+  wish: '添加了心愿',
+  kiss: '想亲'
+}
+
+/** 亲亲这条动态到底在说什么（想亲 / 请愿 / 答应） */
+export function kissAction(meta: Record<string, unknown> | null | undefined): string {
+  const kind = meta?.kind
+  if (kind === 'request') return '递了一张亲亲请愿'
+  if (kind === 'granted') return '答应了亲亲'
+  const n = typeof meta?.count === 'number' ? meta.count : 1
+  return n > 1 ? `想亲 ×${n}` : '想亲'
 }
 
 /**

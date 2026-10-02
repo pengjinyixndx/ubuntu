@@ -22,7 +22,15 @@
 
 <script setup lang="ts">
 import { computed, onMounted } from 'vue'
-import { PenLine, BookOpen, Images as ImagesIcon, CupSoda, Ticket, Sparkles } from 'lucide-vue-next'
+import {
+  PenLine,
+  BookOpen,
+  Images as ImagesIcon,
+  CupSoda,
+  Ticket,
+  Sparkles,
+  Heart
+} from 'lucide-vue-next'
 import type { EventType } from '../types/domain'
 
 const props = defineProps<{ type: EventType }>()
@@ -34,7 +42,9 @@ const ICONS = {
   photo: ImagesIcon,
   milktea_issue: Ticket,
   milktea_redeem: CupSoda,
-  wish: Sparkles
+  milktea_request: Ticket,
+  wish: Sparkles,
+  kiss: Heart
 }
 
 // 印章里的字 + 下方文案，按类型不同
@@ -44,7 +54,9 @@ const MAP: Record<EventType, { stamp: string; text: string }> = {
   photo: { stamp: '印', text: '已冲印' },
   milktea_issue: { stamp: '券', text: '已发出' },
   milktea_redeem: { stamp: '章', text: '已盖章' },
-  wish: { stamp: '愿', text: '已许下' }
+  milktea_request: { stamp: '愿', text: '已递出' },
+  wish: { stamp: '愿', text: '已许下' },
+  kiss: { stamp: '亲', text: '已递出' }
 }
 
 const icon = computed(() => ICONS[props.type])

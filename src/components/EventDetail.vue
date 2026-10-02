@@ -74,10 +74,11 @@ import {
   Ticket,
   CupSoda,
   Sparkles,
+  Heart,
   X
 } from 'lucide-vue-next'
 import type { CoupleEvent, Profile } from '../types/domain'
-import { actorLabel, ACTION_LABELS, dateTimeLabel, milkteaAction } from '../lib/eventLabels'
+import { actorLabel, ACTION_LABELS, dateTimeLabel, kissAction, milkteaAction } from '../lib/eventLabels'
 import { WEATHERS, MOODS, labelOfKey } from '../lib/options'
 
 const props = defineProps<{
@@ -93,16 +94,18 @@ const ICONS = {
   photo: ImagesIcon,
   milktea_issue: Ticket,
   milktea_redeem: CupSoda,
-  wish: Sparkles
+  milktea_request: Ticket,
+  wish: Sparkles,
+  kiss: Heart
 }
 
 const icon = computed(() => ICONS[props.event.type])
 const actor = computed(() => actorLabel(props.event.actor_id, props.me.id, props.me.gender))
-const action = computed(() =>
-  props.event.type === 'milktea_redeem'
-    ? milkteaAction(props.event.meta?.source)
-    : ACTION_LABELS[props.event.type]
-)
+const action = computed(() => {
+  if (props.event.type === 'milktea_redeem') return milkteaAction(props.event.meta?.source)
+  if (props.event.type === 'kiss') return kissAction(props.event.meta)
+  return ACTION_LABELS[props.event.type]
+})
 const dateTime = computed(() => dateTimeLabel(props.event.created_at))
 const isTicket = computed(() => props.event.type === 'milktea_issue')
 const isTea = computed(() => props.event.type === 'milktea_redeem')

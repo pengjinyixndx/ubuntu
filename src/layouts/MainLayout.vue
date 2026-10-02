@@ -25,6 +25,9 @@
 
     <!-- 吵架期间：每次打开都会弹出两份矛盾记录 -->
     <ConflictPopup v-if="showConflict" @done="showConflict = false" />
+
+    <!-- 她递了亲亲请愿：直接在他当前页之上弹出来问 -->
+    <KissAskModal />
   </div>
 </template>
 
@@ -34,6 +37,7 @@ import { useRoute, useRouter } from 'vue-router'
 import { Home, PenLine, HeartHandshake, User } from 'lucide-vue-next'
 import { usePetition } from '../composables/usePetition'
 import ConflictPopup from '../components/ConflictPopup.vue'
+import KissAskModal from '../components/KissAskModal.vue'
 
 const route = useRoute()
 const router = useRouter()

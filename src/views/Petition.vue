@@ -34,6 +34,7 @@
 
 <script setup lang="ts">
 import { computed, onMounted, ref } from 'vue'
+import { useRoute } from 'vue-router'
 import {
   Ticket,
   Sparkles,
@@ -52,6 +53,7 @@ import ConflictPanel from '../components/ConflictPanel.vue'
 type Key = 'milktea' | 'kiss' | 'wish' | 'conflict'
 
 const active = ref<Key | null>(null)
+const route = useRoute()
 
 const {
   pendingRequests,
@@ -136,7 +138,14 @@ function close() {
   active.value = null
 }
 
-onMounted(loadPetition)
+// 「我的 → 待办」跳过来时带着 ?panel=xxx，直接开那一页
+onMounted(async () => {
+  await loadPetition()
+  const want = route.query.panel
+  if (want === 'kiss' || want === 'milktea' || want === 'wish' || want === 'conflict') {
+    active.value = want
+  }
+})
 </script>
 
 <style scoped>

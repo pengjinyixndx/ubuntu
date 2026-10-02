@@ -22,7 +22,9 @@ const EVENT_KIND: Record<string, string> = {
   photo: '照片',
   milktea_issue: '奶茶券（发出）',
   milktea_redeem: '奶茶券（核销）',
-  wish: '心愿'
+  milktea_request: '奶茶券（请愿）',
+  wish: '心愿',
+  kiss: '亲亲'
 }
 
 /** 允许撤销 / 恢复的表 */
