@@ -333,12 +333,22 @@ export const supabaseSource: FeedSource = {
 
   async adminSetRevoked(table: string, id: string, revoked: boolean): Promise<{ error: unknown }> {
     if (!(ADMIN_TABLES as readonly string[]).includes(table)) return { error: '不允许的表' }
-    const { error } = await supabase
+
+    // 同样要把改到的行取回来数：策略没放行时不会报错，但一行也没改
+    const { data, error } = await supabase
       .from(table)
       .update({ revoked_at: revoked ? new Date().toISOString() : null })
       .eq('id', id)
-    if (error) fail(`撤销/恢复失败（${table}）`, error)
-    return { error }
+      .select('id')
+
+    if (error) {
+      fail(`撤销/恢复失败（${table}）`, error)
+      return { error }
+    }
+    if (!data || data.length === 0) {
+      return { error: '数据库一行都没改到——后台的更新策略可能还没生效' }
+    }
+    return { error: null }
   },
 
   async adminListProfiles(): Promise<Result<Profile[]>> {
@@ -361,9 +371,18 @@ export const supabaseSource: FeedSource = {
       if (url) await removePhotos([url])
     }
 
-    const { error } = await supabase.from(table).delete().eq('id', id)
-    if (error) fail(`彻底删除失败（${table}）`, error)
-    return { error }
+    /* 关键：把删掉的行取回来数一数。
+       RLS 没放行时 PostgREST **不报错、却一行都没删**——
+       不自己查的话，界面会显示「已彻底删除」，一刷新数据又回来了。 */
+    const { data, error } = await supabase.from(table).delete().eq('id', id).select('id')
+    if (error) {
+      fail(`彻底删除失败（${table}）`, error)
+      return { error }
+    }
+    if (!data || data.length === 0) {
+      return { error: '数据库一行都没删掉——后台的删除策略可能还没生效' }
+    }
+    return { error: null }
   },
 
   async adminPurgeRevoked(): Promise<{ count: number; error: unknown }> {
