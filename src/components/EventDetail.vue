@@ -103,6 +103,7 @@ import type { CoupleEvent, Profile } from '../types/domain'
 import { actorLabel, ACTION_LABELS, dateTimeLabel, kissAction, milkteaAction } from '../lib/eventLabels'
 import { WEATHERS, MOODS, labelOfKey } from '../lib/options'
 import { getFeedSource } from '../lib/dataSource'
+import { useFeed } from '../composables/useFeed'
 import ConfirmModal from './ConfirmModal.vue'
 
 const props = defineProps<{
@@ -143,6 +144,8 @@ const canDelete = computed(
     !props.event.revoked_at
 )
 
+const { markRevokedId } = useFeed()
+
 const confirming = ref(false)
 const removing = ref(false)
 
@@ -151,6 +154,7 @@ async function removeIt() {
   removing.value = true
   const source = await getFeedSource()
   const { error } = await source.setOwnRevoked(props.event.id, true)
+  if (!error) markRevokedId(props.event.id, true)
   removing.value = false
   confirming.value = false
   if (error) return

@@ -31,3 +31,5 @@ coverage
 .eslintcache
 
 # Cypress
+
+public/splash/links.html

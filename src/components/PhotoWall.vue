@@ -98,14 +98,15 @@ async function save(p: PhotoItem) {
 }
 
 /* —— 全部保存：一张一张来，中间隔 400ms，免得浏览器把连着好几次下载挡掉 —— */
-const saveAllState = ref<'idle' | 'saving' | 'done'>('idle')
+const saveAllState = ref<'idle' | 'saving' | 'done' | 'blocked'>('idle')
 const savedCount = ref(0)
 let doneTimer = 0
 let alive = true
 
 const saveAllLabel = computed(() => {
   if (saveAllState.value === 'saving') return `保存中 ${savedCount.value}/${photos.value.length}`
-  if (saveAllState.value === 'done') return `已保存 ${savedCount.value} 张`
+  if (saveAllState.value === 'blocked') return '取不回来，长按图存'
+    if (saveAllState.value === 'done') return `已保存 ${savedCount.value} 张`
   return '全部保存'
 })
 
@@ -121,7 +122,15 @@ async function saveAll() {
   saveAllState.value = 'saving'
 
   for (const [i, p] of list.entries()) {
-    await saveImage(p.url, photoFileName(p.createdAt, p.id))
+    const r = await saveImage(p.url, photoFileName(p.createdAt, p.id))
+    // 取不回图时会退化成开新窗口；iPhone 上会把标签页开爆，所以立刻停下
+    if (r === 'opened') {
+      saveAllState.value = 'blocked'
+      doneTimer = window.setTimeout(() => {
+        saveAllState.value = 'idle'
+      }, 4000)
+      return
+    }
     if (!alive) return
     savedCount.value = i + 1
     if (i < list.length - 1) await wait(400)

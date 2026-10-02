@@ -23,6 +23,7 @@ const TABLES = [
 type Channel = ReturnType<typeof supabase.channel>
 
 let channel: Channel | null = null
+let fallbackTimer = 0
 
 /**
  * 订阅变化。返回一个取消订阅的函数。
@@ -47,8 +48,13 @@ export function subscribeChanges(onChange: () => void): () => void {
   })
   channel = ch
 
+  // 兜底：订阅万一手握不上或中途断了，也不要一直不更新
+  fallbackTimer = window.setInterval(onChange, 30000)
+
   return () => {
     if (channel) {
+      window.clearInterval(fallbackTimer)
+      fallbackTimer = 0
       void supabase.removeChannel(channel)
       channel = null
     }

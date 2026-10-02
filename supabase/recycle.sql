@@ -79,6 +79,7 @@ select cron.schedule(
   $$
     -- 图片文件：photo_urls 存的是完整公开地址，
     -- storage.objects.name 存的是桶内相对路径，所以要把前缀切掉再比
+    -- （删掉这行记录，公开地址就再也取不到这张图了；文件本身之后由 Supabase 回收）
     delete from storage.objects
      where bucket_id = 'photos'
        and name in (
@@ -86,11 +87,27 @@ select cron.schedule(
            from public.events e, unnest(e.photo_urls) as u
           where e.revoked_at is not null
             and e.revoked_at < now() - interval '90 days'
+         union
+         select regexp_replace(k.photo_url, '^.*/object/public/photos/', '')
+           from public.kisses k
+          where k.photo_url is not null
+            and k.revoked_at is not null
+            and k.revoked_at < now() - interval '90 days'
        );
 
+    -- 六张表都要清：只清 events 的话，别处被撤销的行永远留着
     delete from public.events
-     where revoked_at is not null
-       and revoked_at < now() - interval '90 days';
+     where revoked_at is not null and revoked_at < now() - interval '90 days';
+    delete from public.milktea_requests
+     where revoked_at is not null and revoked_at < now() - interval '90 days';
+    delete from public.kisses
+     where revoked_at is not null and revoked_at < now() - interval '90 days';
+    delete from public.wishes
+     where revoked_at is not null and revoked_at < now() - interval '90 days';
+    delete from public.conflicts
+     where revoked_at is not null and revoked_at < now() - interval '90 days';
+    delete from public.conflict_notes
+     where revoked_at is not null and revoked_at < now() - interval '90 days';
   $$
 );
 

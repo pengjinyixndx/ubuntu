@@ -16,12 +16,35 @@ const loadError = ref<string | null>(null)
 // 一次读多少条。首页是「流」，多给一些，往回滑才有内容
 const FEED_LIMIT = 60
 const CACHE_KEY = 'qingtao_feed_v1'
+const MY_REVOKED_KEY = 'qingtao_my_revoked'
+
+/** 本机记下我删了哪些：冷启动先渲染缓存时，就不会把它又闪出来 */
+function loadMyRevokedIds(): string[] {
+  try {
+    const raw = localStorage.getItem(MY_REVOKED_KEY)
+    const arr = raw ? (JSON.parse(raw) as unknown) : []
+    return Array.isArray(arr) ? (arr as string[]) : []
+  } catch {
+    return []
+  }
+}
+
+function markRevokedId(id: string, revoked: boolean): void {
+  try {
+    const ids = loadMyRevokedIds().filter((x) => x !== id)
+    if (revoked) ids.push(id)
+    localStorage.setItem(MY_REVOKED_KEY, JSON.stringify(ids))
+  } catch {
+    /* 忽略 */
+  }
+}
 
 /** 确保拿到当前登录用户的档案（id + gender） */
 async function ensureMe(): Promise<Profile | null> {
   if (myProfile.value) return myProfile.value
   const source = await getFeedSource()
   myProfile.value = await source.getMe()
+  resolveRoles()
   return myProfile.value
 }
 
@@ -30,6 +53,7 @@ async function ensurePartner(): Promise<Profile | null> {
   if (partnerProfile.value) return partnerProfile.value
   const source = await getFeedSource()
   partnerProfile.value = await source.getPartner()
+  resolveRoles()
   return partnerProfile.value
 }
 
@@ -79,7 +103,10 @@ async function loadEvents(): Promise<void> {
   resolveRoles()
   try {
     const cached = localStorage.getItem(CACHE_KEY)
-    if (cached && !events.value.length) events.value = JSON.parse(cached) as CoupleEvent[]
+    if (cached && !events.value.length) {
+      const killed = loadMyRevokedIds()
+      events.value = (JSON.parse(cached) as CoupleEvent[]).filter((e) => !killed.includes(e.id))
+    }
   } catch {
     /* 缓存不可用就忽略 */
   }
@@ -147,6 +174,11 @@ async function saveProfile(patch: {
  * 不清掉的话换账号进来还是上一个人的档案和动态（两个人会指向同一个账号）。
  */
 function resetFeed(): void {
+  try {
+    localStorage.removeItem(MY_REVOKED_KEY)
+  } catch {
+    /* 忽略 */
+  }
   events.value = []
   myProfile.value = null
   partnerProfile.value = null
@@ -173,6 +205,7 @@ export function useFeed() {
     publishEvent,
     uploadPhoto,
     saveProfile,
+    markRevokedId,
     resetFeed
   }
 }
