@@ -43,6 +43,16 @@ function meId(): string {
   return actingAs === 'partner' ? MOCK_PARTNER.id : MOCK_ME.id
 }
 
+/** 演示用：本机改过的档案（「我是谁」）也存一份 */
+function profilePatch(): Partial<Profile> {
+  try {
+    const raw = localStorage.getItem('qingtao_mock_profile')
+    return raw ? (JSON.parse(raw) as Partial<Profile>) : {}
+  } catch {
+    return {}
+  }
+}
+
 /** 本地演示里后台是否已登录（真实环境是 Supabase 会话） */
 let adminLoggedIn = false
 
@@ -199,11 +209,21 @@ restore()
 /* 演示用：切换身份（见文件顶部说明） */
 export const mockSource: FeedSource = {
   async getMe(): Promise<Profile | null> {
-    return actingAs === 'partner' ? MOCK_PARTNER : MOCK_ME
+    return { ...(actingAs === 'partner' ? MOCK_PARTNER : MOCK_ME), ...profilePatch() }
   },
 
   async getPartner(): Promise<Profile | null> {
     return actingAs === 'partner' ? MOCK_ME : MOCK_PARTNER
+  },
+
+  async updateProfile(patch): Promise<{ error: unknown }> {
+    try {
+      const next = { ...profilePatch(), ...patch }
+      localStorage.setItem('qingtao_mock_profile', JSON.stringify(next))
+    } catch {
+      /* 忽略 */
+    }
+    return { error: null }
   },
 
   async listEvents(limit: number): Promise<LoadResult> {

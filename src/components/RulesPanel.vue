@@ -15,6 +15,21 @@
       </ol>
     </section>
 
+    <!-- 谁是谁是定死的，这里只报一下，不用人配 -->
+    <section class="block">
+      <h3 class="block-title">谁是谁</h3>
+      <ul class="plain">
+        <li>
+          <b>小螃蟹</b>
+          <span>{{ iAmHe ? '你（先注册的那个）' : '他（先注册的那个）' }}</span>
+        </li>
+        <li>
+          <b>银杏叶</b>
+          <span>{{ iAmHer ? '你' : '她' }}</span>
+        </li>
+      </ul>
+    </section>
+
     <section class="block">
       <h3 class="block-title">在哪儿找</h3>
       <ul class="plain">
@@ -41,13 +56,18 @@
 </template>
 
 <script setup lang="ts">
-import { ref } from 'vue'
+import { computed, ref } from 'vue'
+import { useFeed } from '../composables/useFeed'
 import PanelShell from './PanelShell.vue'
 import MilkteaCard from './MilkteaCard.vue'
 import MilkteaDetail from './MilkteaDetail.vue'
 
 const emit = defineEmits<{ close: [] }>()
+const { myProfile } = useFeed()
 const showDetail = ref(false)
+
+const iAmHe = computed(() => myProfile.value?.gender === 'male')
+const iAmHer = computed(() => myProfile.value?.gender === 'female')
 </script>
 
 <style scoped>
@@ -105,5 +125,43 @@ const showDetail = ref(false)
 }
 .plain span {
   color: var(--muted);
+}
+
+/* —— 我是谁 —— */
+.who-row {
+  display: flex;
+  gap: 10px;
+}
+.who {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  padding: 14px 6px 12px;
+  font-family: var(--font-hand);
+  font-size: var(--fs-sm);
+  letter-spacing: 1px;
+  color: var(--muted);
+  background-color: transparent;
+  border: 1.5px dashed var(--line-strong);
+  border-radius: var(--r-sm);
+  cursor: pointer;
+}
+.who.on {
+  color: var(--ink);
+  background-color: var(--photo);
+  border-style: solid;
+  border-color: var(--caramel);
+  box-shadow: var(--shadow-card);
+}
+.who:disabled {
+  opacity: 0.6;
+}
+.who-hint {
+  margin: 10px 0 0;
+  font-family: var(--font-song);
+  font-size: var(--fs-xs);
+  color: var(--faint);
 }
 </style>

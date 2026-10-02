@@ -20,7 +20,8 @@ export type EventType =
 export interface Profile {
   id: string
   email: string
-  gender: Gender
+  /** 数据库里可能还是空的——App 会按注册先后自动定死谁是谁 */
+  gender: Gender | null
   display_name: string | null
   created_at: string
   /** 是否是管理后台账号（第三个账号）。两人 App 必须把这种账号排除在「对象」之外 */

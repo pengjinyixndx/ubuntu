@@ -33,6 +33,27 @@ async function ensurePartner(): Promise<Profile | null> {
   return partnerProfile.value
 }
 
+/**
+ * 谁是谁，是**固定**的，不劳人手动配：
+ * 两个人里先注册的那个是「他」（小螃蟹），另一个是「她」（银杏叶）。
+ * 数据库里 gender 空着也照样分得清（这两个人本来就是定死的）。
+ * 顺带把没起过的昵称补上，省得界面上出现「我的账号」。
+ */
+function resolveRoles(): void {
+  const me = myProfile.value
+  const pa = partnerProfile.value
+  if (!me || !pa) return
+
+  if (!me.gender || !pa.gender) {
+    const meFirst = String(me.created_at ?? '') <= String(pa.created_at ?? '')
+    if (!me.gender) me.gender = meFirst ? 'male' : 'female'
+    if (!pa.gender) pa.gender = meFirst ? 'female' : 'male'
+  }
+
+  if (!me.display_name) me.display_name = me.gender === 'male' ? '小螃蟹' : '银杏叶'
+  if (!pa.display_name) pa.display_name = pa.gender === 'male' ? '小螃蟹' : '银杏叶'
+}
+
 /** 拉取动态流（最新在前）；先读本地缓存立即渲染，再后台更新，避免刷新白屏 */
 async function loadEvents(): Promise<void> {
   loading.value = true
@@ -40,6 +61,7 @@ async function loadEvents(): Promise<void> {
 
   // 1) 先放缓存（stale-while-revalidate）
   await Promise.all([ensureMe(), ensurePartner()])
+  resolveRoles()
   try {
     const cached = localStorage.getItem(CACHE_KEY)
     if (cached && !events.value.length) events.value = JSON.parse(cached) as CoupleEvent[]
@@ -88,6 +110,22 @@ async function uploadPhoto(file: File): Promise<{ url: string | null; error: unk
   return source.uploadPhoto(file)
 }
 
+/**
+ * 保存自己的档案。
+ * 主要是选「我是谁」——决定看到的是哪一边（她的页面 / 他的页面）。
+ */
+async function saveProfile(patch: {
+  gender?: string
+  display_name?: string
+}): Promise<{ error: unknown }> {
+  const source = await getFeedSource()
+  const { error } = await source.updateProfile(patch)
+  if (error) return { error }
+  myProfile.value = await source.getMe()
+  resolveRoles()
+  return { error: null }
+}
+
 export function useFeed() {
   return {
     events,
@@ -97,8 +135,10 @@ export function useFeed() {
     loadError,
     ensureMe,
     ensurePartner,
+    resolveRoles,
     loadEvents,
     publishEvent,
-    uploadPhoto
+    uploadPhoto,
+    saveProfile
   }
 }

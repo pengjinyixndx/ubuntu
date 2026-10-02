@@ -15,11 +15,12 @@ import {
   MOCK_PHOTO_TEA
 } from './mockPhotos'
 
+// 小螃蟹（他）先注册，银杏叶（她）后注册——App 就靠这个先后定谁是谁
 export const MOCK_ME: Profile = {
   id: 'me-0000',
   email: 'me@local',
   gender: 'male',
-  display_name: '阿青',
+  display_name: '小螃蟹',
   created_at: '2026-06-24T00:00:00Z'
 }
 
@@ -27,8 +28,8 @@ export const MOCK_PARTNER: Profile = {
   id: 'her-0000',
   email: 'her@local',
   gender: 'female',
-  display_name: '阿桃',
-  created_at: '2026-06-24T00:00:00Z'
+  display_name: '银杏叶',
+  created_at: '2026-06-25T00:00:00Z'
 }
 
 /** 相对「现在」往前推 n 分钟，生成一条时间可读的动态 */

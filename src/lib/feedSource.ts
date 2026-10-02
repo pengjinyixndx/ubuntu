@@ -47,6 +47,8 @@ export interface FeedSource {
   getMe(): Promise<Profile | null>
   /** 读取对方档案（两人空间，取另一个账号） */
   getPartner(): Promise<Profile | null>
+  /** 改自己的档案：主要是「我是谁」（gender + 昵称），决定看到的是哪一边 */
+  updateProfile(patch: { gender?: string; display_name?: string }): Promise<{ error: unknown }>
   /** 拉取动态流，最新在前 */
   listEvents(limit: number): Promise<LoadResult>
   /** 发布一条动态 */

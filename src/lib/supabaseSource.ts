@@ -67,6 +67,14 @@ export const supabaseSource: FeedSource = {
     return (data as Profile) ?? null
   },
 
+  async updateProfile(patch): Promise<{ error: unknown }> {
+    const uid = await myId()
+    if (!uid) return { error: '未登录' }
+    const { error } = await supabase.from('profiles').update(patch).eq('id', uid)
+    if (error) fail('保存档案失败', error)
+    return { error }
+  },
+
   async listEvents(limit: number): Promise<LoadResult> {
     const { data, error } = await supabase
       .from('events')
