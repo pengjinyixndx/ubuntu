@@ -17,9 +17,9 @@
     </div>
 
     <p class="foot">
-      <span>欠着的亲亲 <b>{{ kissDebt }}</b> 个</span>
+      <span>欠着的亲亲 <b>{{ kissDebt + pending }}</b> 个</span>
       <span v-if="iAmHer" class="dot">·</span>
-      <span v-if="iAmHer">今天还能点 <b>{{ freeLeftToday }}</b> 次</span>
+      <span v-if="iAmHer">今天还能点 <b>{{ leftNow }}</b> 次</span>
     </p>
 
     <!-- 免费十次用完了 -->
@@ -38,7 +38,7 @@
 </template>
 
 <script setup lang="ts">
-import { onUnmounted, ref } from 'vue'
+import { computed, onUnmounted, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { Heart } from 'lucide-vue-next'
 import { usePetition } from '../composables/usePetition'
@@ -49,19 +49,26 @@ const router = useRouter()
 const { askKiss, kissDebt, freeLeftToday } = usePetition()
 const { iAmHer } = useMilktea()
 
-/* 短时间连点几下：先攒着，停手一会儿再合成一条「想亲 ×n」 */
+/* 连点合并：停手「一小会儿」才算一批。
+   原来 1.1 秒太短，稍微喘口气就变成两条记录；现在给足 3.5 秒。 */
+const FREE_WINDOW_MS = 3500
+
 const pending = ref(0)
 const askGo = ref(false)
 let timer = 0
 
+/** 界面上要立刻减少的那几次（还没写进库的） */
+const leftNow = computed(() => Math.max(0, freeLeftToday.value - pending.value))
+
 function tap() {
-  if (freeLeftToday.value <= 0 && pending.value === 0) {
+  // 今天的十次已经点满了（含手上攒着的）：直接问要不要去请愿，不许再往上加
+  if (freeLeftToday.value - pending.value <= 0) {
     askGo.value = true
     return
   }
   pending.value += 1
   window.clearTimeout(timer)
-  timer = window.setTimeout(flush, 1100)
+  timer = window.setTimeout(flush, FREE_WINDOW_MS)
 }
 
 async function flush() {
@@ -78,7 +85,11 @@ function goPetition() {
   router.push({ path: '/petition', query: { panel: 'kiss' } })
 }
 
-onUnmounted(() => window.clearTimeout(timer))
+onUnmounted(() => {
+  window.clearTimeout(timer)
+  // 刚点完就切走/关掉，别把那几下丢掉
+  if (pending.value > 0) void flush()
+})
 </script>
 
 <style scoped>
