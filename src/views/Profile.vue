@@ -181,6 +181,18 @@ const { wishList, kissDebt, pendingKisses, pendingRequests, conflicts, conflictN
   usePetition()
 const { vouchers } = useMilktea()
 
+/** 七天内想做、还没完成的心愿 */
+const soonWishes = computed(() => {
+  const soon = Date.now() + 7 * 86400000
+  const today = new Date().toISOString().slice(0, 10)
+  return wishList.value.filter(
+    (w) =>
+      !w.done &&
+      !!w.want_at &&
+      w.want_at >= today &&
+      new Date(`${w.want_at}T23:59:59`).getTime() <= soon
+  )
+})
 /** 三天内到期、还没用掉的券 */
 const soonVouchers = computed(() => {
   const soon = Date.now() + 3 * 86400000
@@ -217,6 +229,15 @@ const todos = computed<Todo[]>(() => {
     )
   ) {
     out.push({ key: `c${open.id}`, text: '矛盾记录还差你那一份，去写完', panel: 'conflict' })
+  }
+
+  // 心愿快到期（七天内）
+  for (const w of soonWishes.value) {
+    out.push({
+      key: `w${w.id}`,
+      text: `心愿「${(w.content || '').slice(0, 10)}」想在 ${w.want_at} 完成`,
+      panel: 'wish'
+    })
   }
 
   // 奶茶券快过期（三天内）

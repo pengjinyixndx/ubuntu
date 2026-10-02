@@ -26,6 +26,11 @@
     <!-- 吵架期间：每次打开都会弹出两份矛盾记录 -->
     <ConflictPopup v-if="showConflict" @done="showConflict = false" />
 
+    <!-- 有新动静时的轻提示 -->
+    <transition name="toast">
+      <div v-if="notice" class="toast">{{ notice }}</div>
+    </transition>
+
     <!-- 她递了亲亲请愿：直接在他当前页之上弹出来问 -->
     <KissAskModal />
   </div>
@@ -38,6 +43,7 @@ import { Home, PenLine, HeartHandshake, User } from 'lucide-vue-next'
 import { usePetition } from '../composables/usePetition'
 import { useFeed } from '../composables/useFeed'
 import { subscribeChanges } from '../lib/realtime'
+import { USE_MOCK } from '../lib/dataSource'
 import ConflictPopup from '../components/ConflictPopup.vue'
 import KissAskModal from '../components/KissAskModal.vue'
 
@@ -47,6 +53,17 @@ const router = useRouter()
 const { needConflictPopup, loadPetition } = usePetition()
 const { loadEvents } = useFeed()
 let unsub: (() => void) | null = null
+
+/* 轻提示：有新动静时在底部飘一下，2.6 秒自己消失 */
+const notice = ref('')
+let noticeTimer = 0
+function flash(text: string, ms = 2600) {
+  notice.value = text
+  window.clearTimeout(noticeTimer)
+  noticeTimer = window.setTimeout(() => {
+    notice.value = ''
+  }, ms)
+}
 const showConflict = ref(false)
 
 const tabs = [
@@ -69,15 +86,49 @@ onMounted(async () => {
 
   // 实时：对方一发东西，这边立刻刷新（不用等他自己刷新）
   unsub = subscribeChanges(() => {
+    flash('有新的动静，已经刷新')
     void loadEvents()
     void loadPetition()
   })
+
+  // 本地演示没有服务端，留个钩子方便自己看提示效果：__qtToast('文案')
+  if (USE_MOCK) {
+    ;(window as unknown as { __qtToast?: typeof flash }).__qtToast = flash
+  }
 })
 
-onUnmounted(() => unsub?.())
+onUnmounted(() => {
+  unsub?.()
+  window.clearTimeout(noticeTimer)
+})
 </script>
 
 <style scoped>
+.toast {
+  position: absolute;
+  left: 50%;
+  bottom: calc(80px + env(safe-area-inset-bottom));
+  transform: translateX(-50%);
+  z-index: 420;
+  max-width: 80%;
+  padding: 9px 16px;
+  font-family: var(--font-song);
+  font-size: var(--fs-sm);
+  letter-spacing: 0.5px;
+  color: var(--photo);
+  background-color: rgba(43, 37, 29, 0.88);
+  border-radius: var(--r-sm);
+  white-space: nowrap;
+}
+.toast-enter-active,
+.toast-leave-active {
+  transition: opacity 0.25s ease, transform 0.25s ease;
+}
+.toast-enter-from,
+.toast-leave-to {
+  opacity: 0;
+  transform: translate(-50%, 8px);
+}
 .main-layout {
   display: flex;
   flex-direction: column;
