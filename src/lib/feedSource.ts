@@ -97,4 +97,10 @@ export interface FeedSource {
   adminListProfiles(): Promise<Result<Profile[]>>
   /** 撤销 / 恢复一条记录（打标记，不删行） */
   adminSetRevoked(table: string, id: string, revoked: boolean): Promise<{ error: unknown }>
+  /** 彻底删除一条（数据库行 + 照片文件），不可恢复 */
+  adminPurge(table: string, id: string): Promise<{ error: unknown }>
+  /** 清空所有「已撤销」的记录，返回删掉的条数 */
+  adminPurgeRevoked(): Promise<{ count: number; error: unknown }>
+  /** 删除某个时间点之前的全部记录，返回删掉的条数 */
+  adminPurgeBefore(before: string): Promise<{ count: number; error: unknown }>
 }

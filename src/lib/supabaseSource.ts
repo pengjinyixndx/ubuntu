@@ -335,5 +335,83 @@ export const supabaseSource: FeedSource = {
     const { data, error } = await supabase.from('profiles').select('*')
     if (error) fail('后台读取档案失败', error)
     return { data: (data ?? []) as Profile[], error }
+  },
+
+  /* —— 清理工具：彻底删除（连照片一起）、清空已撤销、按时间清空 —— */
+  async adminPurge(table: string, id: string): Promise<{ error: unknown }> {
+    if (!(ADMIN_TABLES as readonly string[]).includes(table)) return { error: '不允许的表' }
+
+    // events 的图片文件也要一起删，不然桶里会留垃圾
+    if (table === 'events') {
+      const { data } = await supabase.from('events').select('photo_urls').eq('id', id).maybeSingle()
+      await removePhotos(((data as { photo_urls?: string[] } | null)?.photo_urls ?? []) as string[])
+    }
+
+    const { error } = await supabase.from(table).delete().eq('id', id)
+    if (error) fail(`彻底删除失败（${table}）`, error)
+    return { error }
+  },
+
+  async adminPurgeRevoked(): Promise<{ count: number; error: unknown }> {
+    const { data: evs, error: readErr } = await supabase
+      .from('events')
+      .select('photo_urls')
+      .not('revoked_at', 'is', null)
+    if (readErr) fail('读取已撤销照片失败', readErr)
+    await removePhotos(
+      ((evs ?? []) as { photo_urls?: string[] }[]).flatMap((e) => e.photo_urls ?? [])
+    )
+
+    let count = 0
+    for (const t of ADMIN_TABLES) {
+      const { data, error } = await supabase
+        .from(t)
+        .delete()
+        .not('revoked_at', 'is', null)
+        .select('id')
+      if (error) fail(`清空已撤销失败（${t}）`, error)
+      count += (data ?? []).length
+    }
+    return { count, error: null }
+  },
+
+  async adminPurgeBefore(before: string): Promise<{ count: number; error: unknown }> {
+    // 传进来的是本地那天的 00:00，转成 ISO 再比
+    const iso = new Date(`${before}T00:00:00`).toISOString()
+
+    const { data: evs, error: readErr } = await supabase
+      .from('events')
+      .select('photo_urls')
+      .lt('created_at', iso)
+    if (readErr) fail('读取待删照片失败', readErr)
+    await removePhotos(
+      ((evs ?? []) as { photo_urls?: string[] }[]).flatMap((e) => e.photo_urls ?? [])
+    )
+
+    let count = 0
+    for (const t of ADMIN_TABLES) {
+      const { data, error } = await supabase.from(t).delete().lt('created_at', iso).select('id')
+      if (error) fail(`按时间清空失败（${t}）`, error)
+      count += (data ?? []).length
+    }
+    return { count, error: null }
+  }
+}
+
+/** 从公开地址里取出它在存储桶里的相对路径 */
+function storagePath(url: string): string | null {
+  const marker = `/storage/v1/object/public/${BUCKET}/`
+  const i = url.indexOf(marker)
+  if (i < 0) return null
+  return decodeURIComponent(url.slice(i + marker.length).split('?')[0] ?? '')
+}
+
+/** 把一批图片文件从存储桶里删掉（一次最多 100 个） */
+async function removePhotos(urls: string[]): Promise<void> {
+  const paths = urls.map(storagePath).filter((p): p is string => !!p)
+  if (!paths.length) return
+  for (let i = 0; i < paths.length; i += 100) {
+    const { error } = await supabase.storage.from(BUCKET).remove(paths.slice(i, i + 100))
+    if (error) fail('删除图片文件失败', error)
   }
 }

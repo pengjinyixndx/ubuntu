@@ -53,6 +53,30 @@
 
     <p v-if="msg" class="msg err">{{ msg }}</p>
 
+    <!-- 清理工具 -->
+    <div class="tools">
+      <button
+        type="button"
+        class="btn small danger"
+        :disabled="busy || !revokedCount"
+        @click="askPurgeRevoked"
+      >
+        清空已撤销（{{ revokedCount }}）
+      </button>
+      <span class="tools-sep">|</span>
+      <span class="tools-label">删除</span>
+      <input v-model="beforeDate" class="tools-date" type="date" />
+      <span class="tools-label">之前的全部记录</span>
+      <button
+        type="button"
+        class="btn small danger"
+        :disabled="busy || !beforeDate"
+        @click="askPurgeBefore"
+      >
+        执行
+      </button>
+    </div>
+
     <div class="table-wrap">
       <table class="table">
         <thead>
@@ -102,12 +126,33 @@
               >
                 {{ r.revoked_at ? '恢复' : '撤销' }}
               </button>
+              <button
+                class="btn small purge"
+                :disabled="busyId === r.table + r.id"
+                @click="askPurgeOne(r)"
+              >
+                彻底删除
+              </button>
             </td>
           </tr>
         </tbody>
       </table>
 
       <p v-if="!visibleRows.length && !loading" class="empty">没有记录</p>
+    </div>
+
+    <!-- 危险操作确认 -->
+    <div v-if="ask" class="ask-mask" @click.self="ask = null">
+      <div class="ask-box">
+        <h3 class="ask-title">{{ ask.title }}</h3>
+        <p class="ask-desc">{{ ask.desc }}</p>
+        <div class="ask-acts">
+          <button type="button" class="btn ghost" @click="ask = null">取消</button>
+          <button type="button" class="btn danger" :disabled="busy" @click="runAsk">
+            {{ ask.confirmText }}
+          </button>
+        </div>
+      </div>
     </div>
   </div>
 </template>
@@ -203,6 +248,86 @@ async function toggleRevoked(r: AdminRecord) {
   }
   // 就地更新，不用整页重拉
   r.revoked_at = target ? new Date().toISOString() : null
+}
+
+/* —— 清理工具：都是不可恢复的动作，先弹确认 —— */
+const beforeDate = ref('')
+
+interface AskJob {
+  title: string
+  desc: string
+  confirmText: string
+  run: () => Promise<void>
+}
+const ask = ref<AskJob | null>(null)
+
+function askPurgeOne(r: AdminRecord) {
+  ask.value = {
+    title: '彻底删除这一条？',
+    desc: `${r.kind} · ${fmt(r.created_at)}。数据库里会真的删掉，带照片的连图片文件一起删，不可恢复。`,
+    confirmText: '彻底删除',
+    run: async () => {
+      busyId.value = r.table + r.id
+      const src = await getFeedSource()
+      const { error } = await src.adminPurge(r.table, r.id)
+      busyId.value = ''
+      if (error) {
+        msg.value = '删除失败，具体看浏览器控制台'
+        return
+      }
+      rows.value = rows.value.filter((x) => !(x.table === r.table && x.id === r.id))
+      msg.value = '已彻底删除'
+    }
+  }
+}
+
+function askPurgeRevoked() {
+  const n = revokedCount.value
+  ask.value = {
+    title: `清空全部已撤销的 ${n} 条？`,
+    desc: '这些记录连同它们的照片文件会从数据库里彻底删掉，不可恢复。',
+    confirmText: `确认清空 ${n} 条`,
+    run: async () => {
+      const src = await getFeedSource()
+      const { count, error } = await src.adminPurgeRevoked()
+      if (error) {
+        msg.value = '清空失败，具体看浏览器控制台'
+        return
+      }
+      await load()
+      msg.value = `已清空 ${count} 条`
+    }
+  }
+}
+
+function askPurgeBefore() {
+  const d = beforeDate.value
+  if (!d) return
+  ask.value = {
+    title: `删除 ${d} 之前的全部记录？`,
+    desc: '按时间一刀切：那个时间点之前的所有记录（含请愿那几张表）连同照片文件都会彻底删掉，不可恢复。',
+    confirmText: '确认删除',
+    run: async () => {
+      const src = await getFeedSource()
+      const { count, error } = await src.adminPurgeBefore(d)
+      if (error) {
+        msg.value = '删除失败，具体看浏览器控制台'
+        return
+      }
+      await load()
+      msg.value = `已删除 ${count} 条`
+    }
+  }
+}
+
+async function runAsk() {
+  const job = ask.value
+  if (!job) return
+  ask.value = null
+  busy.value = true
+  msg.value = ''
+  await job.run()
+  busy.value = false
 }
 
 async function doLogout() {
@@ -443,6 +568,75 @@ tr.revoked .c-who {
 }
 .msg.err {
   color: #d08a6a;
+}
+
+/* —— 清理工具 —— */
+.tools {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+  padding: 0 18px 12px;
+}
+.tools-sep {
+  color: #3a332a;
+}
+.tools-label {
+  font-size: 12px;
+  color: #9a8d78;
+}
+.tools-date {
+  padding: 4px 8px;
+  font-size: 12px;
+  color: #f3ead4;
+  background-color: #1e1a15;
+  border: 1px solid #3a332a;
+  border-radius: 4px;
+}
+.btn.purge {
+  margin-left: 6px;
+  color: #d08a6a;
+  background-color: transparent;
+  border-color: #5a3a30;
+}
+
+/* —— 危险操作确认 —— */
+.ask-mask {
+  position: fixed;
+  inset: 0;
+  z-index: 50;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+  background-color: rgba(10, 8, 6, 0.72);
+}
+.ask-box {
+  width: 100%;
+  max-width: 420px;
+  padding: 20px;
+  background-color: #1e1a15;
+  border: 1px solid #5a3a30;
+  border-radius: 8px;
+}
+.ask-title {
+  margin: 0;
+  font-size: 16px;
+  color: #f3ead4;
+}
+.ask-desc {
+  margin: 10px 0 0;
+  font-size: 13px;
+  line-height: 1.8;
+  color: #b9ac93;
+}
+.ask-acts {
+  display: flex;
+  gap: 10px;
+  margin-top: 18px;
+}
+.ask-acts .btn {
+  flex: 1;
 }
 .empty {
   padding: 30px;

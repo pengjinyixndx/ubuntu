@@ -416,6 +416,69 @@ export const mockSource: FeedSource = {
 
   async adminListProfiles(): Promise<Result<Profile[]>> {
     return { data: [MOCK_ME, MOCK_PARTNER], error: null }
+  },
+
+  /* —— 清理工具（本地演示版）—— */
+  async adminPurge(table: string, id: string) {
+    if (!(ADMIN_TABLES as readonly string[]).includes(table)) return { error: '不允许的表' }
+    const lists: Record<string, { id: string }[]> = {
+      events: store,
+      milktea_requests: requests,
+      kisses,
+      wishes,
+      conflicts,
+      conflict_notes: conflictNotes
+    }
+    const arr = lists[table]
+    if (arr) {
+      const i = arr.findIndex((x) => x.id === id)
+      if (i >= 0) arr.splice(i, 1)
+    }
+    persist()
+    return { error: null }
+  },
+
+  async adminPurgeRevoked() {
+    let count = 0
+    const purge = (arr: { revoked_at?: string | null }[]) => {
+      for (let i = arr.length - 1; i >= 0; i--) {
+        const row = arr[i]
+        if (row && row.revoked_at) {
+          arr.splice(i, 1)
+          count += 1
+        }
+      }
+    }
+    purge(store)
+    purge(requests)
+    purge(kisses)
+    purge(wishes)
+    purge(conflicts)
+    purge(conflictNotes)
+    persist()
+    return { count, error: null }
+  },
+
+  async adminPurgeBefore(before: string) {
+    const t = new Date(`${before}T00:00:00`).getTime()
+    let count = 0
+    const purge = (arr: { created_at: string }[]) => {
+      for (let i = arr.length - 1; i >= 0; i--) {
+        const row = arr[i]
+        if (row && new Date(row.created_at).getTime() < t) {
+          arr.splice(i, 1)
+          count += 1
+        }
+      }
+    }
+    purge(store)
+    purge(requests)
+    purge(kisses)
+    purge(wishes)
+    purge(conflicts)
+    purge(conflictNotes)
+    persist()
+    return { count, error: null }
   }
 }
 
