@@ -51,20 +51,20 @@ export const supabaseSource: FeedSource = {
     const uid = await myId()
     if (!uid) return null
 
-    // 必须排除后台账号，否则两人 App 会把后台账号当成自己的伴侣
-    const { data, error } = await supabase
-      .from('profiles')
-      .select('*')
-      .neq('id', uid)
-      .eq('is_admin', false)
-      .limit(1)
-      .maybeSingle()
+    /* 注意：**不要**把 is_admin 写进查询条件。
+       万一 admin.sql 还没跑，这一列根本不存在，整个查询会直接报错，
+       对方档案就永远拿不到——表现就是「两个账号都指向同一个人」。
+       所以先把除自己以外的全部取回来，再在本地挑掉后台账号。 */
+    const { data, error } = await supabase.from('profiles').select('*').neq('id', uid)
 
     if (error) {
       fail('读取对方档案失败', error)
       return null
     }
-    return (data as Profile) ?? null
+
+    const list = (data ?? []) as Profile[]
+    const partner = list.find((p) => p.is_admin !== true) ?? list[0] ?? null
+    return partner
   },
 
   async updateProfile(patch): Promise<{ error: unknown }> {

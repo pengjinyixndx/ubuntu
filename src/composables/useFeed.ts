@@ -42,16 +42,31 @@ async function ensurePartner(): Promise<Profile | null> {
 function resolveRoles(): void {
   const me = myProfile.value
   const pa = partnerProfile.value
-  if (!me || !pa) return
+  if (!me) return
+  if (!pa) {
+    // 拿不到对方档案就分不清谁是谁 —— 明确报出来，别不声不响地把两个人都当成他
+    console.warn('[青桃] 拿不到对方的档案，无法判断谁是小螃蟹、谁是银杏叶')
+    return
+  }
 
   if (!me.gender || !pa.gender) {
-    const meFirst = String(me.created_at ?? '') <= String(pa.created_at ?? '')
+    /* 先注册的是「他」。两个 created_at 都拿不到时退化成比 id——
+       这一步的意义是**保证两边结果相反**，绝不会两个账号都判成同一个人。 */
+    const a = me.created_at ?? ''
+    const b = pa.created_at ?? ''
+    const meFirst = a && b ? a <= b : me.id < pa.id
+
     if (!me.gender) me.gender = meFirst ? 'male' : 'female'
     if (!pa.gender) pa.gender = meFirst ? 'female' : 'male'
   }
-
   if (!me.display_name) me.display_name = me.gender === 'male' ? '小螃蟹' : '银杏叶'
   if (!pa.display_name) pa.display_name = pa.gender === 'male' ? '小螃蟹' : '银杏叶'
+
+  console.info(
+    `[青桃] 身份判定：我=${me.gender === 'male' ? '小螃蟹' : '银杏叶'}，对方=${
+      pa.gender === 'male' ? '小螃蟹' : '银杏叶'
+    }（依据：先注册的是小螃蟹）`
+  )
 }
 
 /** 拉取动态流（最新在前）；先读本地缓存立即渲染，再后台更新，避免刷新白屏 */
