@@ -16,7 +16,6 @@
     </section>
 
     <!-- 数一数一起攒下的东西 -->
-    <RecentStrip :events="events" class="strip-gap" />
 
     <section class="stats">
       <div class="stat">
@@ -173,7 +172,6 @@ import PhotoWall from '../components/PhotoWall.vue'
 import RulesPanel from '../components/RulesPanel.vue'
 import RestorePanel from '../components/RestorePanel.vue'
 import ConflictHistory from '../components/ConflictHistory.vue'
-import RecentStrip from '../components/RecentStrip.vue'
 import Critter from '../components/Critter.vue'
 import { useMilktea } from '../composables/useMilktea'
 import KissBlock from '../components/KissBlock.vue'
