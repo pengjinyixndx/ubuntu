@@ -233,6 +233,7 @@ function onImgError(e: Event) {
 }
 
 .content-text {
+  flex: 0 0 auto; /* 正文绝不被压缩——压了就会看着像被照片盖住 */
   margin: 0;
   font-family: var(--font-song);
   font-size: var(--fs-base);
@@ -251,7 +252,7 @@ function onImgError(e: Event) {
   -webkit-line-clamp: 2;
 }
 
-/* 带照片的卡片撑满可用高度，剩下的空间全给照片，照片才看得清 */
+/* 带照片的卡片撑满可用高度，剩下的空间全给照片 */
 .feed-card.has-photo {
   height: var(--card-max, 260px);
 }
@@ -310,21 +311,28 @@ function onImgError(e: Event) {
   text-align: center;
 }
 
-/* —— 随笔的一张随手拍：占满剩余高度，随卡片一起收放，绝不撑破卡片 —— */
+/* —— 随笔的一张随手拍 ——
+   不给它裁切：图片按原比例缩到能放下的最大尺寸，整张贴上去（不裁、不变形）。
+   容器是居中弹性盒，图自己按 max-width/max-height 双向收敛。 */
 .note-photo {
   flex: 1 1 auto;
-  min-height: 72px;
+  min-height: 0;
   margin-top: 10px;
-  border: var(--border);
-  border-radius: var(--r-sm);
+  display: flex;
+  align-items: center;
+  justify-content: center;
   overflow: hidden;
-  background-color: var(--paper-deep);
 }
 .note-photo img {
   display: block;
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
+  width: auto;
+  height: auto;
+  max-width: 100%;
+  max-height: 100%;
+  object-fit: contain;
+  border: var(--border);
+  border-radius: var(--r-sm);
+  background-color: var(--paper-deep);
 }
 
 .ticket-mini {
