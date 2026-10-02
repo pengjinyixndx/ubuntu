@@ -49,13 +49,19 @@ const router = useRouter()
 const { askKiss, kissDebt, freeLeftToday } = usePetition()
 const { iAmHer } = useMilktea()
 
-/* 连点合并：停手「一小会儿」才算一批。
-   原来 1.1 秒太短，稍微喘口气就变成两条记录；现在给足 3.5 秒。 */
-const FREE_WINDOW_MS = 3500
+/* 连点合并：每点一下都重新计时，**距上次点击 10 秒内**都算同一批。
+   也就是「一直点就一直续」，停手满了 10 秒才落库成一条「想亲 ×n」。 */
+const FREE_WINDOW_MS = 10000
 
 const pending = ref(0)
 const askGo = ref(false)
 let timer = 0
+
+/** 先攒着，10 秒内没有下一次点击才写进去 */
+function bump() {
+  window.clearTimeout(timer)
+  timer = window.setTimeout(flush, FREE_WINDOW_MS)
+}
 
 /** 界面上要立刻减少的那几次（还没写进库的） */
 const leftNow = computed(() => Math.max(0, freeLeftToday.value - pending.value))
@@ -67,8 +73,7 @@ function tap() {
     return
   }
   pending.value += 1
-  window.clearTimeout(timer)
-  timer = window.setTimeout(flush, FREE_WINDOW_MS)
+  bump()
 }
 
 async function flush() {
