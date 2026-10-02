@@ -75,6 +75,44 @@ export const supabaseSource: FeedSource = {
     return { error }
   },
 
+  async setOwnRevoked(id: string, revoked: boolean): Promise<{ error: unknown }> {
+    const uid = await myId()
+    if (!uid) return { error: '未登录' }
+
+    // 同样要数影响的行：策略没放行时不会报错，但一行也没改
+    const { data, error } = await supabase
+      .from('events')
+      .update({ revoked_at: revoked ? new Date().toISOString() : null })
+      .eq('id', id)
+      .eq('actor_id', uid)
+      .select('id')
+
+    if (error) {
+      fail('删除/恢复失败', error)
+      return { error }
+    }
+    if (!data || data.length === 0) {
+      return { error: '数据库一行都没改到（检查 recycle.sql 里的策略跑没跑）' }
+    }
+    return { error: null }
+  },
+
+  async listMyRevoked(): Promise<Result<CoupleEvent[]>> {
+    const uid = await myId()
+    if (!uid) return { data: [], error: null }
+
+    const { data, error } = await supabase
+      .from('events')
+      .select('*')
+      .eq('actor_id', uid)
+      .not('revoked_at', 'is', null)
+      .order('created_at', { ascending: false })
+      .limit(200)
+
+    if (error) fail('读取回收站失败', error)
+    return { data: (data ?? []) as CoupleEvent[], error }
+  },
+
   async listEvents(limit: number): Promise<LoadResult> {
     const { data, error } = await supabase
       .from('events')

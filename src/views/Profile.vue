@@ -114,6 +114,13 @@
 
     <!-- 菜单清单 -->
     <section class="menu">
+      <!-- 恢复：自己删掉的内容 -->
+      <div class="menu-item" @click="showRestore = true">
+        <RotateCcw :size="18" :stroke-width="1.5" class="mi-icon" />
+        <span class="mi-text">恢复</span>
+        <ChevronRight :size="18" :stroke-width="1.5" class="mi-arrow" />
+      </div>
+
       <div class="menu-item" @click="showRules = true">
         <Settings :size="18" :stroke-width="1.5" class="mi-icon" />
         <span class="mi-text">设置</span>
@@ -133,6 +140,9 @@
 
     <!-- 设置（奶茶规矩都写在这里） -->
     <RulesPanel v-if="showRules" @close="showRules = false" />
+
+    <!-- 恢复：自己删掉的内容在这里找回来 -->
+    <RestorePanel v-if="showRestore" @close="showRestore = false" />
   </div>
 </template>
 
@@ -140,7 +150,7 @@
 import { computed, onMounted, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { supabase } from '../lib/supabase'
-import { Settings, LogOut, ChevronRight, Sparkles, Check } from 'lucide-vue-next'
+import { Settings, LogOut, ChevronRight, Sparkles, Check, RotateCcw } from 'lucide-vue-next'
 import { getTogetherDays } from '../composables/useTogether'
 import { useFeed } from '../composables/useFeed'
 import { usePetition } from '../composables/usePetition'
@@ -149,6 +159,7 @@ import MilkteaCard from '../components/MilkteaCard.vue'
 import MilkteaDetail from '../components/MilkteaDetail.vue'
 import PhotoWall from '../components/PhotoWall.vue'
 import RulesPanel from '../components/RulesPanel.vue'
+import RestorePanel from '../components/RestorePanel.vue'
 import KissBlock from '../components/KissBlock.vue'
 import { actorLabel } from '../lib/eventLabels'
 
@@ -179,6 +190,7 @@ function openTodo(t: Todo) {
 
 const showMilkteaDetail = ref(false)
 const showRules = ref(false)
+const showRestore = ref(false)
 
 const days = getTogetherDays()
 const displayName = computed(() => myProfile.value?.display_name || '我的账号')

@@ -44,6 +44,13 @@
         <button class="btn small ghost" @click="showRevoked = !showRevoked">
           {{ showRevoked ? '隐藏已撤销' : '显示已撤销' }}
         </button>
+        <button
+          class="btn small"
+          :class="{ danger: onlyUserDeleted }"
+          @click="onlyUserDeleted = !onlyUserDeleted"
+        >
+          被用户删的（{{ userDeletedCount }}）
+        </button>
         <button class="btn small ghost" :disabled="loading" @click="load">
           {{ loading ? '读取中…' : '刷新' }}
         </button>
@@ -172,12 +179,19 @@ const msg = ref('')
 const rows = ref<AdminRecord[]>([])
 const profiles = ref<Profile[]>([])
 const showRevoked = ref(true)
+/** 只看「被用户自己删掉的」——后台依旧看得见 */
+const onlyUserDeleted = ref(false)
+const userDeletedCount = computed(() => rows.value.filter((r) => !!r.revoked_at).length)
 const busyId = ref('')
 
 const canLogin = computed(() => email.value.trim().length > 0 && password.value.length > 0)
 const revokedCount = computed(() => rows.value.filter((r) => r.revoked_at).length)
 const visibleRows = computed(() =>
-  showRevoked.value ? rows.value : rows.value.filter((r) => !r.revoked_at)
+  (() => {
+    let out = showRevoked.value ? rows.value : rows.value.filter((r) => !r.revoked_at)
+    if (onlyUserDeleted.value) out = out.filter((r) => !!r.revoked_at)
+    return out
+  })()
 )
 
 function fmt(iso: string): string {

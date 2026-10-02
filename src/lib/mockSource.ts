@@ -226,6 +226,21 @@ export const mockSource: FeedSource = {
     return { error: null }
   },
 
+  async setOwnRevoked(id: string, revoked: boolean) {
+    const e = store.find((x) => x.id === id && x.actor_id === meId())
+    if (!e) return { error: '没有这条记录' }
+    e.revoked_at = revoked ? new Date().toISOString() : undefined
+    persist()
+    return { error: null }
+  },
+
+  async listMyRevoked() {
+    return {
+      data: store.filter((e) => !!e.revoked_at && e.actor_id === meId()),
+      error: null
+    }
+  },
+
   async listEvents(limit: number): Promise<LoadResult> {
     // 和线上一致：已撤销的记录，普通账号查不到
     const sorted = store

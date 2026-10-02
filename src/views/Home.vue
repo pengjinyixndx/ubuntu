@@ -89,7 +89,13 @@
     </section>
 
     <!-- 点开看全文 -->
-    <EventDetail v-if="detailEvent && myProfile" :event="detailEvent" :me="myProfile" @close="detailEvent = null" />
+    <EventDetail
+      v-if="detailEvent && myProfile"
+      :event="detailEvent"
+      :me="myProfile"
+      @close="detailEvent = null"
+      @deleted="loadEvents"
+    />
   </div>
 </template>
 

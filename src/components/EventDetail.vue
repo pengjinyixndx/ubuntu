@@ -7,6 +7,15 @@
           <component :is="icon" :size="16" :stroke-width="1.7" class="head-icon" />
           <span class="head-actor">{{ actor }} {{ action }}</span>
           <span class="head-time">{{ dateTime }}</span>
+          <button
+            v-if="canDelete"
+            type="button"
+            class="del-btn"
+            aria-label="删除"
+            @click="confirming = true"
+          >
+            <Trash2 :size="17" :stroke-width="1.8" />
+          </button>
           <button type="button" class="close-btn" aria-label="关闭" @click="emit('close')">
             <X :size="20" :stroke-width="1.8" />
           </button>
@@ -61,12 +70,24 @@
           <p v-if="event.type === 'photo' && event.content" class="photo-cap">{{ event.content }}</p>
         </div>
       </article>
+
+      <!-- 自己删：双方都看不到，但在「我的 → 恢复」里能自己恢复 -->
+      <ConfirmModal
+        v-if="confirming"
+        title="确认删掉这一条？"
+        desc="删掉之后两个人都看不到了。想找回来，去「我的 → 恢复」。"
+        :lines="event.content ? [`内容：${event.content.slice(0, 40)}`] : []"
+        confirm-text="删掉"
+        danger
+        @cancel="confirming = false"
+        @confirm="removeIt"
+      />
     </div>
   </Teleport>
 </template>
 
 <script setup lang="ts">
-import { computed } from 'vue'
+import { computed, ref } from 'vue'
 import {
   PenLine,
   BookOpen,
@@ -75,18 +96,21 @@ import {
   CupSoda,
   Sparkles,
   Heart,
+  Trash2,
   X
 } from 'lucide-vue-next'
 import type { CoupleEvent, Profile } from '../types/domain'
 import { actorLabel, ACTION_LABELS, dateTimeLabel, kissAction, milkteaAction } from '../lib/eventLabels'
 import { WEATHERS, MOODS, labelOfKey } from '../lib/options'
+import { getFeedSource } from '../lib/dataSource'
+import ConfirmModal from './ConfirmModal.vue'
 
 const props = defineProps<{
   event: CoupleEvent
   me: Profile
 }>()
 
-const emit = defineEmits<{ close: [] }>()
+const emit = defineEmits<{ close: []; deleted: [] }>()
 
 const ICONS = {
   note: PenLine,
@@ -109,6 +133,30 @@ const action = computed(() => {
 const dateTime = computed(() => dateTimeLabel(props.event.created_at))
 const isTicket = computed(() => props.event.type === 'milktea_issue')
 const isTea = computed(() => props.event.type === 'milktea_redeem')
+
+/* 只有自己的「文字类 / 照片类」能自己删；
+   请求类（奶茶请愿）和亲亲不能删——这是你定的规则。 */
+const canDelete = computed(
+  () =>
+    ['note', 'diary', 'photo'].includes(props.event.type) &&
+    props.event.actor_id === props.me.id &&
+    !props.event.revoked_at
+)
+
+const confirming = ref(false)
+const removing = ref(false)
+
+async function removeIt() {
+  if (removing.value) return
+  removing.value = true
+  const source = await getFeedSource()
+  const { error } = await source.setOwnRevoked(props.event.id, true)
+  removing.value = false
+  confirming.value = false
+  if (error) return
+  emit('deleted')
+  emit('close')
+}
 
 const singlePhoto = computed(() =>
   props.event.type === 'note' || props.event.type === 'milktea_redeem'
@@ -218,6 +266,18 @@ function onImgError(e: Event) {
   color: var(--muted);
   white-space: nowrap;
 }
+.del-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  color: var(--brick);
+  background: none;
+  border: none;
+  cursor: pointer;
+}
+
 .close-btn {
   flex-shrink: 0;
   display: flex;

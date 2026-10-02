@@ -49,6 +49,13 @@ export interface FeedSource {
   getPartner(): Promise<Profile | null>
   /** 改自己的档案：主要是「我是谁」（gender + 昵称），决定看到的是哪一边 */
   updateProfile(patch: { gender?: string; display_name?: string }): Promise<{ error: unknown }>
+  /**
+   * 自己删 / 自己恢复：只写 revoked_at，不动正文。
+   * 删完双方都看不到，本人可以在「我的 → 恢复」里恢复；后台始终看得见。
+   */
+  setOwnRevoked(id: string, revoked: boolean): Promise<{ error: unknown }>
+  /** 回收站：列出自己删掉的 */
+  listMyRevoked(): Promise<Result<CoupleEvent[]>>
   /** 拉取动态流，最新在前 */
   listEvents(limit: number): Promise<LoadResult>
   /** 发布一条动态 */
