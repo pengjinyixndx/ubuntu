@@ -22,12 +22,23 @@
           <button type="button" class="btn ghost" :disabled="busy" @click="settle('calm')">
             先冷静一下
           </button>
-          <button type="button" class="btn primary" :disabled="busy" @click="settle('resolved')">
+          <button type="button" class="btn primary" :disabled="busy" @click="askMakeUp">
             和好吧
           </button>
         </div>
         <p class="hint">选「冷静」不会结束这件事，下次打开还会看到</p>
       </div>
+
+      <!-- 强制提醒：和好要等 3 秒才能确认 -->
+      <ConfirmModal
+        v-if="confirm"
+        title="确认和好？"
+        desc="和好之后这件事就结束了，不会再弹这个窗口。"
+        :lines="[]"
+        confirm-text="确认和好"
+        @cancel="confirm = false"
+        @confirm="runMakeUp"
+      />
     </div>
   </Teleport>
 </template>
@@ -37,6 +48,7 @@ import { computed, ref } from 'vue'
 import { usePetition } from '../composables/usePetition'
 import { useFeed } from '../composables/useFeed'
 import { actorLabel, timeLabel } from '../lib/eventLabels'
+import ConfirmModal from './ConfirmModal.vue'
 
 const emit = defineEmits<{ done: [] }>()
 const { myProfile } = useFeed()
@@ -58,6 +70,16 @@ async function settle(status: 'calm' | 'resolved') {
   await setConflictStatus(openConflict.value.id, status)
   busy.value = false
   emit('done')
+}
+
+/* 和好是不可逆的，先弹强制提醒 */
+const confirm = ref(false)
+function askMakeUp() {
+  confirm.value = true
+}
+async function runMakeUp() {
+  confirm.value = false
+  await settle('resolved')
 }
 </script>
 

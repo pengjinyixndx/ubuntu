@@ -13,7 +13,7 @@
         <span class="date-label">想在什么时候</span>
         <input v-model="wantAt" class="date" type="date" />
       </label>
-      <button type="button" class="btn primary" :disabled="!canAdd || busy" @click="submit">
+      <button type="button" class="btn primary" :disabled="!canAdd || busy" @click="askSubmit">
         许下
       </button>
       <p v-if="msg" class="msg" :class="{ err: isErr }">{{ msg }}</p>
@@ -64,6 +64,17 @@
         </li>
       </ul>
     </section>
+
+    <!-- 强制提醒 -->
+    <ConfirmModal
+      v-if="confirm"
+      :title="confirm.title"
+      :desc="confirm.desc"
+      :lines="confirm.lines"
+      :confirm-text="confirm.confirmText"
+      @cancel="confirm = null"
+      @confirm="runConfirm"
+    />
   </PanelShell>
 </template>
 
@@ -75,6 +86,7 @@ import { usePetition } from '../composables/usePetition'
 import { useFeed } from '../composables/useFeed'
 import { actorLabel } from '../lib/eventLabels'
 import PanelShell from './PanelShell.vue'
+import ConfirmModal from './ConfirmModal.vue'
 
 const emit = defineEmits<{ close: [] }>()
 const { myProfile } = useFeed()
@@ -114,6 +126,37 @@ async function submit() {
   content.value = ''
   wantAt.value = ''
   msg.value = '许下啦'
+}
+
+/* 发布心愿要先过强制提醒 */
+interface PendingConfirm {
+  title: string
+  desc: string
+  lines: string[]
+  confirmText: string
+  run: () => Promise<void>
+}
+const confirm = ref<PendingConfirm | null>(null)
+
+function askSubmit() {
+  if (!canAdd.value) return
+  confirm.value = {
+    title: '确认许下这个心愿？',
+    desc: '许下之后会记进展示流，两个人都能看到。',
+    lines: [
+      `心愿：${content.value.trim()}`,
+      `想完成的时间：${wantAt.value ? fmt(wantAt.value) : '没定'}`
+    ],
+    confirmText: '确认许下',
+    run: submit
+  }
+}
+
+async function runConfirm() {
+  const job = confirm.value
+  if (!job) return
+  confirm.value = null
+  await job.run()
 }
 
 async function toggle(id: string, v: boolean) {

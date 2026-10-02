@@ -1,5 +1,5 @@
 <template>
-  <div class="mcard" :class="{ compact }">
+  <div class="mcard" :class="{ compact, clickable }" @click="clickable && emit('open')">
     <!-- 她的符号：银杏叶，做个小水印 -->
     <Critter kind="ginkgo" :size="compact ? 16 : 18" class="mcard-leaf" />
 
@@ -34,17 +34,28 @@
     <p v-if="!drinkable" class="mcard-hint">
       这周的免费已经用过啦，让他给你发张券吧
     </p>
+
+    <!-- 可点开看每张券的详情 -->
+    <p v-if="clickable" class="mcard-more">
+      查看每张券的明细
+      <ChevronRight :size="13" :stroke-width="1.8" />
+    </p>
   </div>
 </template>
 
 <script setup lang="ts">
 import { onMounted } from 'vue'
-import { CupSoda } from 'lucide-vue-next'
+import { CupSoda, ChevronRight } from 'lucide-vue-next'
 import { useMilktea } from '../composables/useMilktea'
 import { useFeed } from '../composables/useFeed'
 import Critter from './Critter.vue'
 
-withDefaults(defineProps<{ compact?: boolean }>(), { compact: false })
+withDefaults(defineProps<{ compact?: boolean; clickable?: boolean }>(), {
+  compact: false,
+  clickable: false
+})
+
+const emit = defineEmits<{ open: [] }>()
 
 const { drinkable, freeRemaining, voucherBalance, issuedCount, vouchersUsed } = useMilktea()
 
@@ -139,6 +150,28 @@ onMounted(() => {
   font-family: var(--font-hand);
   font-size: var(--fs-sm);
   color: var(--muted);
+}
+
+/* 可点开明细 */
+.mcard.clickable {
+  cursor: pointer;
+  transition: transform 0.15s ease;
+}
+.mcard.clickable:active {
+  transform: scale(0.985);
+}
+.mcard-more {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  margin: 12px 0 0;
+  padding-top: 10px;
+  border-top: var(--border-dashed);
+  font-family: var(--font-song);
+  font-size: var(--fs-xs);
+  letter-spacing: 1px;
+  color: var(--caramel);
 }
 
 /* 紧凑版（我的页） */

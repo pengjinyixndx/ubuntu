@@ -82,7 +82,7 @@ import MilkteaCard from './MilkteaCard.vue'
 import PublishFlash from './PublishFlash.vue'
 
 const emit = defineEmits<{ close: [] }>()
-const { drinkable, nextSource, redeem } = useMilktea()
+const { canDrink, nextSource, redeem, iAmHer } = useMilktea()
 
 const flavor = ref('')
 const sweet = ref('')
@@ -91,9 +91,11 @@ const saving = ref(false)
 const errMsg = ref('')
 const flash = ref(false)
 
-const canRedeem = computed(() => drinkable.value > 0 && !saving.value)
+const canRedeem = computed(() => canDrink.value && !saving.value)
 
 const quotaHint = computed(() => {
+  // 单向规则：额度是她的，他自己喝不占额度、也不受限
+  if (!iAmHer.value) return '你自己喝的，照记一笔，不占她的额度'
   if (nextSource.value === 'free') return '这次用「本周免费」'
   if (nextSource.value === 'voucher') return '这次用掉一张奶茶券'
   return '这周的额度用完了'

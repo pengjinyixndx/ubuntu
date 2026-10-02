@@ -83,7 +83,11 @@ export function usePetition() {
   }
 
   /** 审批：同意时会真的发一张券（写一条 milktea_issue 动态，券余额才算得上） */
-  async function resolveRequest(id: string, status: Exclude<RequestStatus, 'pending'>) {
+  async function resolveRequest(
+    id: string,
+    status: Exclude<RequestStatus, 'pending'>,
+    opts?: { expires_at?: string }
+  ) {
     const src = await getFeedSource()
     const target = requests.value.find((x) => x.id === id)
     const { error } = await src.resolveMilkteaRequest(id, status)
@@ -93,19 +97,24 @@ export function usePetition() {
       await publishEvent({
         type: 'milktea_issue',
         content: '奶茶券 · 一张',
-        meta: { count: 1, reason: target?.reason ?? null, from_request: id }
+        meta: {
+          count: 1,
+          reason: target?.reason ?? null,
+          expires_at: opts?.expires_at ?? null,
+          from_request: id
+        }
       })
     }
     await loadPetition()
     return { error: null }
   }
 
-  /** 主动发券 */
-  async function issueVoucher(reason: string) {
+  /** 主动发券：必须写因何故 + 到期时间 */
+  async function issueVoucher(reason: string, expiresAt: string) {
     const { error } = await publishEvent({
       type: 'milktea_issue',
       content: '奶茶券 · 一张',
-      meta: { count: 1, reason: reason || null }
+      meta: { count: 1, reason: reason || null, expires_at: expiresAt || null }
     })
     if (!error) await loadPetition()
     return { error }

@@ -10,7 +10,7 @@
           <li>两份都填完才算「进入」——在那之前谁都别想跳过；</li>
           <li>期间每次打开青桃都会弹出两份记录，你要选「冷静」还是「和好」。</li>
         </ol>
-        <button type="button" class="btn primary" :disabled="busy" @click="start">
+        <button type="button" class="btn primary" :disabled="busy" @click="askStart">
           开始一份矛盾记录
         </button>
         <p v-if="msg" class="msg" :class="{ err: isErr }">{{ msg }}</p>
@@ -82,7 +82,7 @@
           <button type="button" class="btn ghost" :disabled="busy" @click="settle('calm')">
             先冷静一下
           </button>
-          <button type="button" class="btn primary" :disabled="busy" @click="settle('resolved')">
+          <button type="button" class="btn primary" :disabled="busy" @click="askSettle">
             和好吧
           </button>
         </div>
@@ -100,6 +100,18 @@
         </li>
       </ul>
     </section>
+
+    <!-- 强制提醒 -->
+    <ConfirmModal
+      v-if="confirm"
+      :title="confirm.title"
+      :desc="confirm.desc"
+      :lines="confirm.lines"
+      :confirm-text="confirm.confirmText"
+      :danger="confirm.danger"
+      @cancel="confirm = null"
+      @confirm="runConfirm"
+    />
   </PanelShell>
 </template>
 
@@ -110,6 +122,7 @@ import { usePetition } from '../composables/usePetition'
 import { useFeed } from '../composables/useFeed'
 import { actorLabel, dateTimeLabel, timeLabel } from '../lib/eventLabels'
 import PanelShell from './PanelShell.vue'
+import ConfirmModal from './ConfirmModal.vue'
 
 const emit = defineEmits<{ close: [] }>()
 const { myProfile } = useFeed()
@@ -189,6 +202,48 @@ async function start() {
     isErr.value = true
     msg.value = '已经有进行中的记录了'
   }
+}
+
+/* —— 两个不可逆的动作，都要先过强制提醒 —— */
+interface PendingConfirm {
+  title: string
+  desc: string
+  lines: string[]
+  confirmText: string
+  danger: boolean
+  run: () => Promise<void>
+}
+const confirm = ref<PendingConfirm | null>(null)
+
+function askStart() {
+  confirm.value = {
+    title: '确认开始一份矛盾记录？',
+    desc: '开始之后，两个人都要各写一份（什么时候、因为什么、诉求），两份齐了才算进入。',
+    lines: ['进入之后，每次打开青桃都会弹出这两份记录，直到你们选「冷静」或「和好」。'],
+    confirmText: '确认开始',
+    danger: true,
+    run: start
+  }
+}
+
+function askSettle() {
+  confirm.value = {
+    title: '确认和好？',
+    desc: '和好之后这件事就结束了，会进「以前的」列表。',
+    lines: [],
+    confirmText: '确认和好',
+    danger: false,
+    run: async () => {
+      await settle('resolved')
+    }
+  }
+}
+
+async function runConfirm() {
+  const job = confirm.value
+  if (!job) return
+  confirm.value = null
+  await job.run()
 }
 
 async function submitNote() {

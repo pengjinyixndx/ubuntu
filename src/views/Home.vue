@@ -43,6 +43,7 @@
       ref="feedRef"
       class="feed"
       :class="{ dragging: isDragging }"
+      :style="feedStyle"
       @touchstart.passive="onTouchStart"
       @touchmove="onTouchMove"
       @touchend="onTouchEnd"
@@ -93,7 +94,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, onMounted, onUnmounted, ref, type CSSProperties } from 'vue'
+import { computed, nextTick, onMounted, onUnmounted, ref, type CSSProperties } from 'vue'
 import { PenLine } from 'lucide-vue-next'
 import TopDecor from '../components/TopDecor.vue'
 import EventCard from '../components/EventCard.vue'
@@ -110,6 +111,8 @@ const { events, myProfile, loading, loadEvents } = useFeed()
 
 const feedRef = ref<HTMLElement | null>(null)
 const W = ref(390)
+// 卡片可用高度：由 .feed 的实际高度算出来，交给卡片当 max-height
+const cardMax = ref(260)
 // 当前居中卡片的下标（events 最新在前，0 = 最新）
 const activeIndex = ref(0)
 const dragDx = ref(0)
@@ -117,8 +120,16 @@ const isDragging = ref(false)
 const detailEvent = ref<CoupleEvent | null>(null)
 
 function measure() {
-  if (feedRef.value) W.value = feedRef.value.clientWidth
+  if (!feedRef.value) return
+  W.value = feedRef.value.clientWidth
+  // 树枝下沿 44 + 垂茎 110 + 底部留白 10
+  cardMax.value = Math.max(150, feedRef.value.clientHeight - 44 - 110 - 10)
 }
+
+const feedStyle = computed(() => {
+  const s: Record<string, string> = { '--card-max': `${cardMax.value}px` }
+  return s as CSSProperties
+})
 
 const clamp = (n: number, lo: number, hi: number) => Math.min(hi, Math.max(lo, n))
 
@@ -223,6 +234,8 @@ onMounted(async () => {
   measure()
   window.addEventListener('resize', measure)
   await loadEvents()
+  await nextTick()
+  measure() // 卡片渲染出来之后再量一次，此时 .feed 才有真实高度
   activeIndex.value = 0
 })
 
@@ -242,7 +255,7 @@ onUnmounted(() => window.removeEventListener('resize', measure))
 .days-card {
   position: relative;
   max-width: 320px;
-  margin: 14px auto 0;
+  margin: 6px auto 0;
   background-color: var(--photo);
   border: var(--border);
   border-radius: var(--r-sm);
@@ -267,8 +280,8 @@ onUnmounted(() => window.removeEventListener('resize', measure))
 }
 
 .inner {
-  margin: 10px;
-  padding: 16px 16px 14px;
+  margin: 8px;
+  padding: 11px 14px 10px;
   border: var(--border-dashed);
   border-radius: var(--r-sm);
   text-align: center;
@@ -291,7 +304,7 @@ onUnmounted(() => window.removeEventListener('resize', measure))
 
 .days-num {
   font-family: var(--font-serif);
-  font-size: 52px;
+  font-size: 44px;
   font-weight: 700;
   line-height: 1;
   color: var(--ink);
@@ -312,8 +325,8 @@ onUnmounted(() => window.removeEventListener('resize', measure))
 
 /* —— 每日祝福 —— */
 .blessing {
-  margin-top: 12px;
-  padding-top: 10px;
+  margin-top: 8px;
+  padding-top: 8px;
   border-top: 1px dashed var(--line);
 }
 
@@ -338,7 +351,7 @@ onUnmounted(() => window.removeEventListener('resize', measure))
   display: flex;
   align-items: center;
   gap: 12px;
-  margin: 18px 0 0;
+  margin: 10px 0 0;
 }
 
 .divider-line {

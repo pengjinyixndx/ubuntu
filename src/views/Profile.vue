@@ -31,8 +31,8 @@
       </div>
     </section>
 
-    <!-- 她的奶茶卡：本周还能喝几杯（他管） -->
-    <MilkteaCard compact />
+    <!-- 她的奶茶卡：本周还能喝几杯（点开看每张券的明细） -->
+    <MilkteaCard compact clickable @open="showMilkteaDetail = true" />
 
     <!-- 照片墙 -->
     <section class="section">
@@ -57,6 +57,15 @@
           <div class="polaroid-img">
             <img :src="p.url" :alt="p.caption || '照片'" loading="lazy" @error="onImgError" />
           </div>
+          <button
+            type="button"
+            class="polaroid-save"
+            :disabled="savingPhoto === p.id"
+            aria-label="保存到本地"
+            @click.stop="download(p)"
+          >
+            <Download :size="13" :stroke-width="2" />
+          </button>
           <figcaption v-if="p.caption" class="polaroid-cap">{{ p.caption }}</figcaption>
         </figure>
       </div>
@@ -110,23 +119,37 @@
         <span class="mi-text logout">退出登录</span>
       </div>
     </section>
+
+    <!-- 奶茶券明细 -->
+    <MilkteaDetail v-if="showMilkteaDetail" @close="showMilkteaDetail = false" />
   </div>
 </template>
 
 <script setup lang="ts">
-import { computed, onMounted } from 'vue'
+import { computed, onMounted, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { supabase } from '../lib/supabase'
-import { Settings, LogOut, ChevronRight, Images, Sparkles, Check } from 'lucide-vue-next'
+import {
+  Settings,
+  LogOut,
+  ChevronRight,
+  Images,
+  Sparkles,
+  Check,
+  Download
+} from 'lucide-vue-next'
 import { getTogetherDays } from '../composables/useTogether'
 import { useFeed } from '../composables/useFeed'
 import { usePetition } from '../composables/usePetition'
 import { USE_MOCK } from '../lib/dataSource'
 import MilkteaCard from '../components/MilkteaCard.vue'
+import MilkteaDetail from '../components/MilkteaDetail.vue'
 
 const router = useRouter()
 const { events, myProfile, loading, loadEvents } = useFeed()
 const { wishList, kissDebt, loadPetition } = usePetition()
+
+const showMilkteaDetail = ref(false)
 
 const days = getTogetherDays()
 const displayName = computed(() => myProfile.value?.display_name || '我的账号')
@@ -148,14 +171,44 @@ interface WishItem {
 
 const photos = computed<PhotoItem[]>(() => {
   const items: PhotoItem[] = []
+  // 不分出处：随笔的随手拍、照片动态，只要有图就收进照片墙
   for (const ev of events.value) {
-    if (ev.type !== 'photo' || !ev.photo_urls?.length) continue
+    if (!ev.photo_urls?.length) continue
     for (const url of ev.photo_urls) {
-      items.push({ id: `${ev.id}-${url}`, url, caption: ev.content || '', createdAt: ev.created_at })
+      items.push({
+        id: `${ev.id}-${url}`,
+        url,
+        caption: ev.content || '',
+        createdAt: ev.created_at
+      })
     }
   }
   return items
 })
+
+/** 保存到本地：先取回图片再触发下载；跨域取不回来就打开原图让用户长按保存 */
+const savingPhoto = ref('')
+async function download(p: PhotoItem) {
+  savingPhoto.value = p.id
+  try {
+    const res = await fetch(p.url, { mode: 'cors' })
+    if (!res.ok) throw new Error(String(res.status))
+    const blob = await res.blob()
+    const ext = (blob.type.split('/')[1] || 'jpg').replace('jpeg', 'jpg')
+    const href = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = href
+    a.download = `青桃-${p.createdAt.slice(0, 10)}-${p.id.slice(-6)}.${ext}`
+    document.body.appendChild(a)
+    a.click()
+    a.remove()
+    setTimeout(() => URL.revokeObjectURL(href), 5000)
+  } catch {
+    window.open(p.url, '_blank')
+  } finally {
+    savingPhoto.value = ''
+  }
+}
 
 // 心愿单以请愿页维护的那份为准（可以标记完成）
 const wishes = computed<WishItem[]>(() =>
@@ -443,6 +496,27 @@ onMounted(() => {
   width: 100%;
   height: 100%;
   object-fit: cover;
+}
+
+/* 保存到本地 */
+.polaroid-save {
+  position: absolute;
+  top: 14px;
+  right: 14px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  color: var(--photo);
+  background-color: rgba(43, 37, 29, 0.5);
+  border: none;
+  border-radius: 50%;
+  cursor: pointer;
+  z-index: 2;
+}
+.polaroid-save:disabled {
+  opacity: 0.5;
 }
 
 .polaroid-cap {

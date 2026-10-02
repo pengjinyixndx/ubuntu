@@ -1,5 +1,5 @@
 <template>
-  <article class="feed-card" :class="{ current }" @click="$emit('pick')">
+  <article class="feed-card" :class="{ current, 'has-photo': !!singlePhoto }" @click="$emit('pick')">
     <!-- 抬头 -->
     <div class="card-head">
       <component :is="icon" :size="15" :stroke-width="1.7" class="head-icon" />
@@ -20,7 +20,11 @@
       <!-- 奶茶券 -->
       <div v-else-if="isTicket" class="ticket-mini">
         <component :is="icon" :size="20" :stroke-width="1.6" />
-        <span>{{ event.content || '奶茶券' }}</span>
+        <div class="ticket-body">
+          <span class="ticket-title">{{ event.content || '奶茶券' }}</span>
+          <span v-if="issueReason" class="ticket-line">因：{{ issueReason }}</span>
+          <span v-if="issueExpiry" class="ticket-line">有效期至 {{ issueExpiry }}</span>
+        </div>
       </div>
 
       <!-- 喝奶茶（核销） -->
@@ -125,6 +129,21 @@ const teaChips = computed(() => {
   )
 })
 
+// 颁发奶茶券：理由 + 到期时间，都要在展示流上看得到
+const issueReason = computed(() => {
+  if (props.event.type !== 'milktea_issue') return ''
+  const r = props.event.meta?.reason
+  return typeof r === 'string' ? r : ''
+})
+const issueExpiry = computed(() => {
+  if (props.event.type !== 'milktea_issue') return ''
+  const v = props.event.meta?.expires_at
+  if (typeof v !== 'string' || !v) return ''
+  const d = new Date(`${v}T00:00:00`)
+  if (Number.isNaN(d.getTime())) return v
+  return `${d.getFullYear()}年${d.getMonth() + 1}月${d.getDate()}日`
+})
+
 // 超过约 80 字就折叠，提示点开看全文
 const tooLong = computed(() => (props.event.content?.length ?? 0) > 80)
 
@@ -159,6 +178,8 @@ function onImgError(e: Event) {
   margin: 0;
   display: flex;
   flex-direction: column;
+  /* 卡片可用高度由首页按 .feed 实际高度算出来，保证挂在枝上也绝不超出底部 */
+  max-height: var(--card-max, 260px);
   background-color: var(--photo);
   border: var(--border);
   border-radius: var(--r-md);
@@ -172,6 +193,7 @@ function onImgError(e: Event) {
 }
 
 .card-head {
+  flex-shrink: 0;
   display: flex;
   align-items: center;
   gap: 6px;
@@ -202,7 +224,12 @@ function onImgError(e: Event) {
 }
 
 .card-content {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow: hidden;
   padding: 12px 13px;
+  display: flex;
+  flex-direction: column;
 }
 
 .content-text {
@@ -214,9 +241,19 @@ function onImgError(e: Event) {
   white-space: pre-wrap;
   word-break: break-word;
   display: -webkit-box;
-  -webkit-line-clamp: 6;
+  -webkit-line-clamp: 5;
   -webkit-box-orient: vertical;
   overflow: hidden;
+}
+
+/* 带随手拍时，正文只留 2 行，把版面让给照片 */
+.feed-card.has-photo .content-text {
+  -webkit-line-clamp: 2;
+}
+
+/* 带照片的卡片撑满可用高度，剩下的空间全给照片，照片才看得清 */
+.feed-card.has-photo {
+  height: var(--card-max, 260px);
 }
 
 /* —— 小标签（天气/心情、口味/甜度）—— */
@@ -273,8 +310,10 @@ function onImgError(e: Event) {
   text-align: center;
 }
 
-/* —— 随笔的一张随手拍 —— */
+/* —— 随笔的一张随手拍：占满剩余高度，随卡片一起收放，绝不撑破卡片 —— */
 .note-photo {
+  flex: 1 1 auto;
+  min-height: 72px;
   margin-top: 10px;
   border: var(--border);
   border-radius: var(--r-sm);
@@ -282,8 +321,9 @@ function onImgError(e: Event) {
   background-color: var(--paper-deep);
 }
 .note-photo img {
+  display: block;
   width: 100%;
-  max-height: 190px;
+  height: 100%;
   object-fit: cover;
 }
 
@@ -299,9 +339,25 @@ function onImgError(e: Event) {
   font-family: var(--font-song);
   font-size: var(--fs-base);
 }
+.ticket-body {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  min-width: 0;
+}
+.ticket-title {
+  color: var(--brick);
+}
+.ticket-line {
+  font-size: var(--fs-xs);
+  line-height: 1.6;
+  color: var(--muted);
+  word-break: break-word;
+}
 
-/* —— 查看全文提示 —— */
+/* —— 查看全文提示：永远钉在卡片底部，不被内容挤掉 —— */
 .more-hint {
+  flex-shrink: 0;
   display: flex;
   align-items: center;
   justify-content: center;

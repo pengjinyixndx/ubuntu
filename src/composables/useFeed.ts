@@ -9,6 +9,7 @@ import { getFeedSource } from '../lib/dataSource'
 // 模块级单例，避免各页面各拉一份
 const events = ref<CoupleEvent[]>([])
 const myProfile = ref<Profile | null>(null)
+const partnerProfile = ref<Profile | null>(null)
 const loading = ref(false)
 const loadError = ref<string | null>(null)
 
@@ -24,13 +25,21 @@ async function ensureMe(): Promise<Profile | null> {
   return myProfile.value
 }
 
+/** 确保拿到对方档案（奶茶额度要按「她」算，所以必须要） */
+async function ensurePartner(): Promise<Profile | null> {
+  if (partnerProfile.value) return partnerProfile.value
+  const source = await getFeedSource()
+  partnerProfile.value = await source.getPartner()
+  return partnerProfile.value
+}
+
 /** 拉取动态流（最新在前）；先读本地缓存立即渲染，再后台更新，避免刷新白屏 */
 async function loadEvents(): Promise<void> {
   loading.value = true
   loadError.value = null
 
   // 1) 先放缓存（stale-while-revalidate）
-  await ensureMe()
+  await Promise.all([ensureMe(), ensurePartner()])
   try {
     const cached = localStorage.getItem(CACHE_KEY)
     if (cached && !events.value.length) events.value = JSON.parse(cached) as CoupleEvent[]
@@ -83,9 +92,11 @@ export function useFeed() {
   return {
     events,
     myProfile,
+    partnerProfile,
     loading,
     loadError,
     ensureMe,
+    ensurePartner,
     loadEvents,
     publishEvent,
     uploadPhoto
