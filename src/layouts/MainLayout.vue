@@ -51,7 +51,7 @@ const route = useRoute()
 const router = useRouter()
 
 const { needConflictPopup, loadPetition } = usePetition()
-const { loadEvents } = useFeed()
+const { loadEvents, lastLocalWriteAt } = useFeed()
 let unsub: (() => void) | null = null
 
 /* 轻提示：有新动静时在底部飘一下，2.6 秒自己消失 */
@@ -85,10 +85,18 @@ onMounted(async () => {
   if (needConflictPopup.value) showConflict.value = true
 
   // 实时：对方一发东西，这边立刻刷新（不用等他自己刷新）
-  unsub = subscribeChanges(() => {
-    flash('有新的动静，已经刷新')
-    void loadEvents()
-    void loadPetition()
+  unsub = subscribeChanges({
+    // 真的有人动了数据：刷新 + 提示（但自己刚发完的那 6 秒内不提示）
+    onChange: () => {
+      if (Date.now() - lastLocalWriteAt() > 6000) flash('有新的动静，已经刷新')
+      void loadEvents()
+      void loadPetition()
+    },
+    // 兜底轮询：只是怕实时断了，安静地刷新，不要弹提示
+    onPoll: () => {
+      void loadEvents()
+      void loadPetition()
+    }
   })
 
   // 本地演示没有服务端，留个钩子方便自己看提示效果：__qtToast('文案')

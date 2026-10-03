@@ -18,6 +18,16 @@ const FEED_LIMIT = 60
 const CACHE_KEY = 'qingtao_feed_v1'
 const MY_REVOKED_KEY = 'qingtao_my_revoked'
 
+/** 我上一次自己动手写数据的时间。实时事件里也包含我自己写的，
+    所以短时间内收到的事件不算「对方的动静」，不弹提示。 */
+let lastLocalWrite = 0
+export function lastLocalWriteAt(): number {
+  return lastLocalWrite
+}
+function markLocalWrite(): void {
+  lastLocalWrite = Date.now()
+}
+
 /** 本机记下我删了哪些：冷启动先渲染缓存时，就不会把它又闪出来 */
 function loadMyRevokedIds(): string[] {
   try {
@@ -137,6 +147,7 @@ async function publishEvent(input: {
   photo_urls?: string[]
   meta?: Record<string, unknown>
 }): Promise<{ error: unknown }> {
+  markLocalWrite()
   const source = await getFeedSource()
   const { error } = await source.addEvent(input)
   if (error) return { error }
@@ -206,6 +217,8 @@ export function useFeed() {
     uploadPhoto,
     saveProfile,
     markRevokedId,
+    markLocalWrite,
+    lastLocalWriteAt,
     resetFeed
   }
 }

@@ -144,7 +144,7 @@ const canDelete = computed(
     !props.event.revoked_at
 )
 
-const { markRevokedId } = useFeed()
+const { markRevokedId, markLocalWrite } = useFeed()
 
 const confirming = ref(false)
 const removing = ref(false)
@@ -154,7 +154,10 @@ async function removeIt() {
   removing.value = true
   const source = await getFeedSource()
   const { error } = await source.setOwnRevoked(props.event.id, true)
-  if (!error) markRevokedId(props.event.id, true)
+  if (!error) {
+    markRevokedId(props.event.id, true)
+    markLocalWrite()
+  }
   removing.value = false
   confirming.value = false
   if (error) return

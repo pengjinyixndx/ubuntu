@@ -32,7 +32,7 @@ import { dateTimeLabel } from '../lib/eventLabels'
 import PanelShell from './PanelShell.vue'
 
 const emit = defineEmits<{ close: [] }>()
-const { loadEvents, markRevokedId } = useFeed()
+const { loadEvents, markRevokedId, markLocalWrite } = useFeed()
 
 const all = ref<CoupleEvent[]>([])
 const loading = ref(true)
@@ -71,6 +71,7 @@ async function restore(id: string) {
     return
   }
   markRevokedId(id, false)
+  markLocalWrite()
   all.value = all.value.filter((x) => x.id !== id)
   // 展示流要跟着把这条放回去
   await loadEvents()

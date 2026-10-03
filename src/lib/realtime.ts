@@ -29,7 +29,12 @@ let fallbackTimer = 0
  * 订阅变化。返回一个取消订阅的函数。
  * 本地演示模式（VITE_USE_MOCK=1）没有服务端，直接返回空实现。
  */
-export function subscribeChanges(onChange: () => void): () => void {
+export function subscribeChanges(opts: {
+  /** 真的有人动了数据 */
+  onChange: () => void
+  /** 兜底轮询（每 30 秒一次）。只是怕实时断了而静默刷新，**不要给提示** */
+  onPoll?: () => void
+}): () => void {
   if (USE_MOCK) return () => {}
   if (channel) return () => {}
 
@@ -38,7 +43,7 @@ export function subscribeChanges(onChange: () => void): () => void {
     ch = ch.on(
       'postgres_changes',
       { event: '*', schema: 'public', table },
-      () => onChange()
+      () => opts.onChange()
     )
   }
   ch.subscribe((status) => {
@@ -49,7 +54,7 @@ export function subscribeChanges(onChange: () => void): () => void {
   channel = ch
 
   // 兜底：订阅万一手握不上或中途断了，也不要一直不更新
-  fallbackTimer = window.setInterval(onChange, 30000)
+  fallbackTimer = window.setInterval(() => (opts.onPoll ?? opts.onChange)(), 30000)
 
   return () => {
     if (channel) {
