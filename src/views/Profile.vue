@@ -68,7 +68,7 @@
       <button type="button" class="wall-entry" @click="showWall = true">
         <span class="wall-strip">
           <span v-for="p in previewPhotos" :key="p.id" class="strip-cell">
-            <img :src="p.url" alt="" loading="lazy" @error="onImgError" />
+            <img :src="thumbUrlOf(p.url)" :data-full="p.url" alt="" loading="lazy" decoding="async" @error="onImageError" />
           </span>
           <span v-if="!previewPhotos.length" class="strip-empty">还没有照片</span>
           <span v-else-if="photos.length > previewPhotos.length" class="strip-more">
@@ -176,6 +176,7 @@ import Critter from '../components/Critter.vue'
 import { useMilktea } from '../composables/useMilktea'
 import KissBlock from '../components/KissBlock.vue'
 import { actorLabel } from '../lib/eventLabels'
+import { thumbUrlOf, onImageError } from '../lib/image'
 
 const router = useRouter()
 const { events, myProfile, loading, loadEvents, resetFeed } = useFeed()

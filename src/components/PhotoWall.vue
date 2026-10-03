@@ -21,7 +21,7 @@
     <div v-else class="wall">
       <figure v-for="p in photos" :key="p.id" class="cell" @click="big = p">
         <div class="cell-img">
-          <img :src="p.url" :alt="p.caption || '照片'" loading="lazy" @error="onImgError" />
+          <img :src="thumbUrlOf(p.url)" :data-full="p.url" :alt="p.caption || '照片'" loading="lazy" decoding="async" @error="onImageError" />
         </div>
         <figcaption class="cell-foot">
           <span class="cell-cap">{{ p.caption || '没写说明' }}</span>
@@ -59,6 +59,7 @@ import { Download } from 'lucide-vue-next'
 import type { CoupleEvent } from '../types/domain'
 import { useFeed } from '../composables/useFeed'
 import { photoFileName, saveImage } from '../lib/download'
+import { thumbUrlOf, onImageError } from '../lib/image'
 import PanelShell from './PanelShell.vue'
 
 const emit = defineEmits<{ close: [] }>()

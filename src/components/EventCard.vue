@@ -12,7 +12,7 @@
       <!-- 照片：整组 -->
       <div v-if="event.type === 'photo'" class="photo-grid">
         <div v-for="(url, i) in visiblePhotos" :key="i" class="photo-cell">
-          <img :src="url" alt="照片" loading="lazy" @error="onImgError" />
+          <img :src="thumbUrlOf(url)" :data-full="url" alt="照片" loading="lazy" decoding="async" @error="onImageError" />
           <span v-if="i === 2 && restCount > 0" class="photo-more">+{{ restCount }}</span>
         </div>
       </div>
@@ -34,7 +34,7 @@
         </div>
         <p v-if="event.content" class="content-text">{{ event.content }}</p>
         <div v-if="singlePhoto" class="note-photo">
-          <img :src="singlePhoto" alt="这一杯" loading="lazy" @error="onImgError" />
+          <img :src="thumbUrlOf(singlePhoto)" :data-full="singlePhoto" alt="这一杯" loading="lazy" decoding="async" @error="onImageError" />
         </div>
       </div>
 
@@ -46,7 +46,7 @@
         <p v-if="event.content" class="content-text">{{ event.content }}</p>
         <!-- 随笔可选带一张随手拍 -->
         <div v-if="singlePhoto" class="note-photo">
-          <img :src="singlePhoto" alt="随手拍" loading="lazy" @error="onImgError" />
+          <img :src="thumbUrlOf(singlePhoto)" :data-full="singlePhoto" alt="随手拍" loading="lazy" decoding="async" @error="onImageError" />
         </div>
       </template>
 
@@ -77,6 +77,7 @@ import {
 import type { CoupleEvent, Profile } from '../types/domain'
 import { actorLabel, ACTION_LABELS, kissAction, timeLabel, milkteaAction } from '../lib/eventLabels'
 import { WEATHERS, MOODS, labelOfKey } from '../lib/options'
+import { thumbUrlOf, onImageError } from '../lib/image'
 
 const props = defineProps<{
   event: CoupleEvent

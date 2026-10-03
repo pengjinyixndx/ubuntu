@@ -17,6 +17,7 @@ import type {
 } from '../types/domain'
 import type { FeedSource, LoadResult, PublishInput, Result, UploadResult } from './feedSource'
 import { ADMIN_TABLES, buildAdminRecords } from './adminRecords'
+import { makeThumb } from './image'
 
 /** 图片存储桶名（需在 Supabase 建好，见 supabase/storage.sql） */
 const BUCKET = 'photos'
@@ -152,14 +153,30 @@ export const supabaseSource: FeedSource = {
     const ext = file.name.split('.').pop()?.toLowerCase() || 'jpg'
     const path = `${uid}/${Date.now()}-${Math.random().toString(36).slice(2, 8)}.${ext}`
 
+    /* 缓存给一年：文件名带时间戳、永不重复，所以不会看到旧图。
+       原来是 1 小时，等于每次打开都重新下载。 */
     const { error } = await supabase.storage.from(BUCKET).upload(path, file, {
-      cacheControl: '3600',
+      cacheControl: '31536000',
       upsert: false
     })
 
     if (error) {
       fail('上传照片失败', error)
       return { url: null, error }
+    }
+
+    /* 再传一张缩略图（同一个目录、文件名多 -t）。
+       失败了不影响主流程：显示端拿不到小图会自己退回原图。 */
+    try {
+      const thumb = await makeThumb(file)
+      const dot = path.lastIndexOf('.')
+      const thumbPath = dot > 0 ? `${path.slice(0, dot)}-t.jpg` : `${path}-t.jpg`
+      await supabase.storage.from(BUCKET).upload(thumbPath, thumb, {
+        cacheControl: '31536000',
+        upsert: true
+      })
+    } catch {
+      /* 缩略图只是加速，失败就算了 */
     }
 
     const { data } = supabase.storage.from(BUCKET).getPublicUrl(path)
