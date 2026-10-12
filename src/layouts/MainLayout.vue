@@ -8,6 +8,9 @@
       <span class="pb-text">{{ pauseSince }} 起暂停</span>
     </button>
 
+    <!-- 暂停期间：每到一个页面，换一句话（不指责，只说事实） -->
+    <p v-if="inPause" class="pause-note">{{ pauseNote }}</p>
+
     <!-- 页面内容区 -->
     <main class="content">
       <router-view v-slot="{ Component }">
@@ -60,14 +63,23 @@ import KissAskModal from '../components/KissAskModal.vue'
 const route = useRoute()
 const router = useRouter()
 
-const { needConflictPopup, openConflict, loadPetition } = usePetition()
+const { needConflictPopup, openConflict, pauseOpen, loadPetition } = usePetition()
 
 /* 一份矛盾里：两份都写完的那一刻（status 变成 active）就要弹，
    不能只在打开 App 时才检查。同一个会话里处理过就不再反复弹。 */
 const shownConflicts = ref<string[]>([])
 /** 暂停中：到处都能点开和好入口 */
-const showPause = ref(false)
+const showPause = pauseOpen
 const inPause = computed(() => needConflictPopup.value)
+/** 每一页换一句：同一件事，七种说法，不像警报 */
+const pauseNote = computed(() => {
+  const p = route.path
+  if (p.startsWith('/record')) return '暂停期间先不记录。想说话，点上面那条断线。'
+  if (p.startsWith('/petition')) return '她递过来的都还在这儿，只是先不回。'
+  if (p.startsWith('/profile')) return '你还能看每一条，只是暂时不能开口。'
+  return '这些都还在，只是你们暂时不说话。'
+})
+
 const pauseSince = computed(() =>
   openConflict.value ? dateTimeLabel(openConflict.value.created_at) : ''
 )
@@ -140,6 +152,17 @@ onUnmounted(() => {
 </script>
 
 <style scoped>
+.pause-note {
+  flex-shrink: 0;
+  margin: 0;
+  padding: 8px 16px 9px;
+  background-color: var(--paper-deep);
+  border-bottom: 1px solid var(--line);
+  font-family: var(--font-song);
+  font-size: var(--fs-xs);
+  line-height: 1.7;
+  color: var(--muted);
+}
 /* —— 暂停：那条断线 —— */
 .pause-bar {
   flex-shrink: 0;

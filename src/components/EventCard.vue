@@ -85,6 +85,8 @@
         </div>
       </template>
 
+      <p v-if="beforePause" class="pause-mark">这条是你们暂停之前发的</p>
+
       <!-- 照片组的一行说明 -->
       <p v-if="event.type === 'photo' && event.content" class="cap">{{ event.content }}</p>
     </div>
@@ -113,6 +115,7 @@ import type { CoupleEvent, Profile } from '../types/domain'
 import { actorLabel, ACTION_LABELS, kissAction, timeLabel, milkteaAction } from '../lib/eventLabels'
 import { WEATHERS, MOODS, labelOfKey } from '../lib/options'
 import Critter from './Critter.vue'
+import { usePetition } from '../composables/usePetition'
 import { thumbUrlOf, onImageError } from '../lib/image'
 
 const props = defineProps<{
@@ -146,6 +149,10 @@ const isText = computed(() => ['note', 'diary', 'wish'].includes(props.event.typ
 const isTicket = computed(() => props.event.type === 'milktea_issue')
 const isTea = computed(() => props.event.type === 'milktea_redeem')
 const isKiss = computed(() => props.event.type === 'kiss')
+
+/* 暂停期间、且是对方发的：标一句这是暂停之前发的，不指责只说事实 */
+const { needConflictPopup: inPause } = usePetition()
+const beforePause = computed(() => inPause.value && props.event.actor_id !== props.me.id)
 
 /* 亲亲这张卡：两个人是定死的（她亲、他收），所以这里写死"小螃蟹" */
 const kissKind = computed(() => String(props.event.meta?.kind ?? 'ask'))
@@ -406,6 +413,14 @@ function onImgError(e: Event) {
   background-color: var(--paper-deep);
 }
 
+.pause-mark {
+  margin: 8px 0 0;
+  padding-top: 7px;
+  border-top: var(--border-dashed);
+  font-family: var(--font-song);
+  font-size: var(--fs-xs);
+  color: var(--faint);
+}
 /* —— 亲亲：两个人之间一颗心 —— */
 .kiss {
   display: flex;

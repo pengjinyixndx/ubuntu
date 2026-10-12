@@ -41,9 +41,11 @@ import NoteEditor from '../components/NoteEditor.vue'
 import DiaryEditor from '../components/DiaryEditor.vue'
 import PhotoEditor from '../components/PhotoEditor.vue'
 import MilkteaRecord from '../components/MilkteaRecord.vue'
+import { usePetition } from '../composables/usePetition'
 
 const active = ref('')
 const { events, myProfile, loadEvents } = useFeed()
+const { needConflictPopup: inPause, pauseOpen } = usePetition()
 
 // 直接进本页时也要有数据，否则「上次」算不出来
 onMounted(() => {
@@ -96,7 +98,12 @@ const dateLine = computed(() => {
 
 
 
+/* 暂停期间不让人写东西：不是报错，而是把和好入口叫出来 */
 function openEntry(item: { key: string }) {
+  if (inPause.value) {
+    pauseOpen.value = true
+    return
+  }
   active.value = item.key
 }
 

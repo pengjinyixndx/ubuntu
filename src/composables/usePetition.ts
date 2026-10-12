@@ -33,6 +33,9 @@ const conflicts = ref<Conflict[]>([])
 const conflictNotes = ref<ConflictNote[]>([])
 const loading = ref(false)
 
+/** 和好入口是否打开。模块级，所以任何页面都能把它叫出来 */
+const pauseOpen = ref(false)
+
 /** 是否同一天（本地时区） */
 function isToday(iso: string): boolean {
   const d = new Date(iso)
@@ -318,6 +321,7 @@ const pendingRequests = computed(() => requests.value.filter((x) => x.status ===
     conflicts,
     conflictNotes,
     loading,
+    pauseOpen,
     resetPetition,
     partnerName,
     myId,

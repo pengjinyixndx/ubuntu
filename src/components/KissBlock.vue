@@ -47,7 +47,7 @@ import { useMilktea } from '../composables/useMilktea'
 import Critter from './Critter.vue'
 
 const router = useRouter()
-const { askKiss, kissDebt, freeLeftToday } = usePetition()
+const { askKiss, kissDebt, freeLeftToday, needConflictPopup: inPause, pauseOpen } = usePetition()
 const { iAmHer } = useMilktea()
 
 /* 连点合并：每点一下都重新计时，**距上次点击 10 秒内**都算同一批。
@@ -68,6 +68,12 @@ function bump() {
 const leftNow = computed(() => Math.max(0, freeLeftToday.value - pending.value))
 
 function tap() {
+  // 暂停期间不亲：把和好入口叫出来
+  if (inPause.value) {
+    pauseOpen.value = true
+    return
+  }
+
   // 今天的十次已经点满了（含手上攒着的）：直接问要不要去请愿，不许再往上加
   if (freeLeftToday.value - pending.value <= 0) {
     askGo.value = true
