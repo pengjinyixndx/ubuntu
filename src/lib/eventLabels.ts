@@ -20,13 +20,13 @@ export const ACTION_LABELS: Record<EventType, string> = {
   kiss: '想亲'
 }
 
-/** 亲亲这条动态到底在说什么（想亲 / 请愿 / 答应） */
+/** 亲亲这条动态到底在说什么。
+ *  抬头只说"这是哪一类"，具体亲谁、几下，交给卡片正文讲，别重复。 */
 export function kissAction(meta: Record<string, unknown> | null | undefined): string {
   const kind = meta?.kind
-  if (kind === 'request') return '递了一张亲亲请愿'
+  if (kind === 'request') return '写了一张亲亲请愿'
   if (kind === 'granted') return '答应了亲亲'
-  const n = typeof meta?.count === 'number' ? meta.count : 1
-  return n > 1 ? `想亲 ×${n}` : '想亲'
+  return '想要亲亲'
 }
 
 /**

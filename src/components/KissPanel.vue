@@ -12,8 +12,8 @@
       </div>
     </section>
 
-    <!-- 写一张亲亲请愿 -->
-    <section class="block">
+    <!-- 写一张亲亲请愿：这是她的动作，他那边不显示 -->
+    <section v-if="iAmHer" class="block">
       <h3 class="block-title">递一张亲亲请愿</h3>
 
       <button v-if="!photoUrl" type="button" class="photo-empty" @click="picker?.open()">

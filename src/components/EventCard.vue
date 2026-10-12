@@ -38,6 +38,41 @@
         </div>
       </div>
 
+      <!-- 亲亲：小螃蟹和银杏叶之间的一颗心 -->
+      <div v-else-if="isKiss" class="kiss">
+        <div class="kiss-pair">
+          <Critter kind="ginkgo" :size="24" class="kiss-leaf" />
+          <span class="kiss-heart"><Heart :size="15" :stroke-width="1.6" fill="currentColor" /></span>
+          <Critter kind="crab" :size="24" class="kiss-crab" />
+        </div>
+
+        <p class="kiss-line">{{ kissLine }}</p>
+
+        <div v-if="kissCount > 0" class="kiss-hearts">
+          <Heart
+            v-for="n in Math.min(kissCount, 6)"
+            :key="n"
+            :size="12"
+            :stroke-width="1.4"
+            fill="currentColor"
+          />
+          <span v-if="kissCount > 6" class="kiss-more">共 {{ kissCount }} 个</span>
+        </div>
+
+        <p v-if="kissReason" class="kiss-reason">{{ kissReason }}</p>
+
+        <div v-if="singlePhoto" class="note-photo">
+          <img
+            :src="thumbUrlOf(singlePhoto)"
+            :data-full="singlePhoto"
+            alt="附的照片"
+            loading="lazy"
+            decoding="async"
+            @error="onImageError"
+          />
+        </div>
+      </div>
+
       <!-- 随笔 / 日记 / 心愿 -->
       <template v-else>
         <div v-if="diaryChips.length" class="chips">
@@ -77,6 +112,7 @@ import {
 import type { CoupleEvent, Profile } from '../types/domain'
 import { actorLabel, ACTION_LABELS, kissAction, timeLabel, milkteaAction } from '../lib/eventLabels'
 import { WEATHERS, MOODS, labelOfKey } from '../lib/options'
+import Critter from './Critter.vue'
 import { thumbUrlOf, onImageError } from '../lib/image'
 
 const props = defineProps<{
@@ -109,6 +145,22 @@ const action = computed(() => {
 const isText = computed(() => ['note', 'diary', 'wish'].includes(props.event.type))
 const isTicket = computed(() => props.event.type === 'milktea_issue')
 const isTea = computed(() => props.event.type === 'milktea_redeem')
+const isKiss = computed(() => props.event.type === 'kiss')
+
+/* 亲亲这张卡：两个人是定死的（她亲、他收），所以这里写死"小螃蟹" */
+const kissKind = computed(() => String(props.event.meta?.kind ?? 'ask'))
+const kissCount = computed(() => {
+  if (kissKind.value === 'request') return 1
+  const n = props.event.meta?.count
+  return typeof n === 'number' && n > 0 ? n : 1
+})
+const kissLine = computed(() => {
+  if (kissKind.value === 'granted') return '小螃蟹答应了'
+  return kissCount.value > 1 ? `想亲小螃蟹 ${kissCount.value} 下` : '想亲小螃蟹一下'
+})
+const kissReason = computed(() =>
+  kissKind.value === 'request' && props.event.content ? props.event.content : ''
+)
 
 // 照片卡片最多预览 3 张，其余折叠成 +N
 const visiblePhotos = computed(() => props.event.photo_urls?.slice(0, 3) ?? [])
@@ -354,6 +406,72 @@ function onImgError(e: Event) {
   background-color: var(--paper-deep);
 }
 
+/* —— 亲亲：两个人之间一颗心 —— */
+.kiss {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  padding: 2px 0 2px;
+}
+.kiss-pair {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.kiss-leaf {
+  color: var(--caramel);
+}
+.kiss-crab {
+  color: var(--brick);
+}
+.kiss-heart {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 26px;
+  height: 26px;
+  color: var(--brick);
+  background-color: rgba(173, 79, 56, 0.1);
+  border-radius: 50%;
+  animation: kiss-beat 1.6s ease-in-out infinite;
+}
+@keyframes kiss-beat {
+  0%, 100% { transform: scale(1); }
+  50% { transform: scale(1.14); }
+}
+.kiss-line {
+  margin: 0;
+  font-family: var(--font-hand);
+  font-size: var(--fs-md);
+  letter-spacing: 1px;
+  color: var(--ink);
+}
+.kiss-hearts {
+  display: flex;
+  align-items: center;
+  gap: 3px;
+  color: var(--brick);
+}
+.kiss-more {
+  margin-left: 3px;
+  font-family: var(--font-song);
+  font-size: var(--fs-xs);
+  color: var(--muted);
+}
+.kiss-reason {
+  margin: 0;
+  padding: 8px 11px;
+  max-width: 100%;
+  background-color: var(--paper);
+  border: var(--border-dashed);
+  border-radius: var(--r-sm);
+  font-family: var(--font-song);
+  font-size: var(--fs-sm);
+  line-height: 1.7;
+  color: var(--ink-soft);
+  word-break: break-word;
+}
 .ticket-mini {
   display: flex;
   align-items: center;
