@@ -85,7 +85,12 @@ export function usePetition() {
   }
 
   /* ============ 奶茶券 ============ */
-  const pendingRequests = computed(() => requests.value.filter((x) => x.status === 'pending'))
+  /* 只算「对方递过来、等我回」的。
+   原来漏了 requester 判断，结果她自己的请求也出现在「等她点头」里，
+   于是她能同意自己递的申请（你测出来的那个）。 */
+const pendingRequests = computed(() =>
+  requests.value.filter((x) => x.status === 'pending' && x.requester !== myId.value)
+)
   const myRequests = computed(() => requests.value.filter((x) => x.requester === myId.value))
 
   async function requestMilktea(reason: string) {
