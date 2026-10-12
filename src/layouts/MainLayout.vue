@@ -1,5 +1,13 @@
 <template>
   <div class="main-layout">
+    <!-- 暂停：两个小家伙之间那条线是断的，点它就是和好入口 -->
+    <button v-if="inPause" type="button" class="pause-bar" @click="showPause = true">
+      <Critter kind="crab" :size="17" class="pb-face" />
+      <span class="pb-line"></span>
+      <Critter kind="ginkgo" :size="17" class="pb-face" />
+      <span class="pb-text">{{ pauseSince }} 起暂停</span>
+    </button>
+
     <!-- 页面内容区 -->
     <main class="content">
       <router-view v-slot="{ Component }">
@@ -23,8 +31,8 @@
       </div>
     </nav>
 
-    <!-- 吵架期间：每次打开都会弹出两份矛盾记录 -->
-    <ConflictPopup v-if="showConflict" @done="showConflict = false" />
+    <!-- 和好入口（暂停中随时可以点开；不再是简单弹窗） -->
+    <PauseSheet v-if="showPause" @close="showPause = false" @done="showPause = false" />
 
     <!-- 有新动静时的轻提示 -->
     <transition name="toast">
@@ -37,14 +45,16 @@
 </template>
 
 <script setup lang="ts">
-import { onMounted, onUnmounted, ref, watch } from 'vue'
+import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { Home, PenLine, HeartHandshake, User } from 'lucide-vue-next'
 import { usePetition } from '../composables/usePetition'
 import { useFeed } from '../composables/useFeed'
 import { subscribeChanges } from '../lib/realtime'
 import { USE_MOCK } from '../lib/dataSource'
-import ConflictPopup from '../components/ConflictPopup.vue'
+import PauseSheet from '../components/PauseSheet.vue'
+import Critter from '../components/Critter.vue'
+import { dateTimeLabel } from '../lib/eventLabels'
 import KissAskModal from '../components/KissAskModal.vue'
 
 const route = useRoute()
@@ -55,13 +65,19 @@ const { needConflictPopup, openConflict, loadPetition } = usePetition()
 /* 一份矛盾里：两份都写完的那一刻（status 变成 active）就要弹，
    不能只在打开 App 时才检查。同一个会话里处理过就不再反复弹。 */
 const shownConflicts = ref<string[]>([])
+/** 暂停中：到处都能点开和好入口 */
+const showPause = ref(false)
+const inPause = computed(() => needConflictPopup.value)
+const pauseSince = computed(() =>
+  openConflict.value ? dateTimeLabel(openConflict.value.created_at) : ''
+)
 watch(
   needConflictPopup,
   (need) => {
     const c = openConflict.value
     if (!need || !c || shownConflicts.value.includes(c.id)) return
     shownConflicts.value.push(c.id)
-    showConflict.value = true
+    showPause.value = true
   },
   { immediate: true }
 )
@@ -78,7 +94,7 @@ function flash(text: string, ms = 2600) {
     notice.value = ''
   }, ms)
 }
-const showConflict = ref(false)
+
 
 const tabs = [
   { name: '首页', path: '/home', icon: Home },
@@ -124,6 +140,43 @@ onUnmounted(() => {
 </script>
 
 <style scoped>
+/* —— 暂停：那条断线 —— */
+.pause-bar {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  width: 100%;
+  padding: 9px 16px;
+  background-color: var(--photo);
+  border: none;
+  border-bottom: 1px solid var(--line-strong);
+  cursor: pointer;
+}
+.pb-face {
+  color: var(--caramel);
+  flex-shrink: 0;
+}
+.pb-line {
+  width: 26px;
+  height: 2px;
+  flex-shrink: 0;
+  background-image: linear-gradient(
+    to right,
+    var(--line-strong) 0 5px,
+    transparent 5px 9px,
+    var(--line-strong) 9px 14px,
+    transparent 14px 18px,
+    var(--line-strong) 18px 26px
+  );
+}
+.pb-text {
+  margin-left: auto;
+  font-family: var(--font-typewriter);
+  font-size: 10.5px;
+  color: var(--muted);
+}
+
 .toast {
   position: absolute;
   left: 50%;
