@@ -22,7 +22,7 @@
 
     <!-- 逐张列出来 -->
     <section class="block">
-      <h3 class="block-title">每一张券</h3>
+      <details open><summary><h3 class="block-title">每一张券</h3></summary>
 
       <p v-if="!vouchers.length" class="empty">还没有发过券</p>
 
@@ -48,11 +48,12 @@
           </p>
         </li>
       </ul>
+    </details>
     </section>
 
     <!-- 每一次喝，扣的到底是什么。没有这一块，余额一变根本无从判断 -->
     <section class="block">
-      <h3 class="block-title">每一次喝</h3>
+      <details open><summary><h3 class="block-title">每一次喝</h3></summary>
 
       <p v-if="!drinks.length" class="empty">还没有喝过</p>
 
@@ -73,10 +74,11 @@
       <p class="foot-note">
         这一周免费已经{{ freeRemaining ? '还有' : '用完' }}；券按先发先用，所以第几张券对应第几次用券。
       </p>
+    </details>
     </section>
     <!-- 亲亲：欠账、额度、以及每一次请求和同意情况 -->
     <section class="block">
-      <h3 class="block-title">亲亲</h3>
+      <details open><summary><h3 class="block-title">亲亲</h3></summary>
 
       <p class="kiss-sum">
         <span v-if="iAmHer">小螃蟹欠你 <b>{{ kissDebt }}</b> 个亲亲</span>
@@ -99,6 +101,7 @@
           <span class="d-how" :class="k.tone">{{ k.state }}</span>
         </li>
       </ul>
+    </details>
     </section>
   </PanelShell>
 </template>
@@ -263,6 +266,35 @@ onMounted(() => {
   font-size: var(--fs-xs);
   line-height: 1.8;
   color: var(--faint);
+}
+/* —— 可折叠的三块：数字常显，长列表折起来 —— */
+details > summary {
+  list-style: none;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 7px;
+}
+details > summary::-webkit-details-marker {
+  display: none;
+}
+details > summary::after {
+  content: "";
+  width: 6px;
+  height: 6px;
+  margin-left: auto;
+  border-right: 1.4px solid var(--faint);
+  border-bottom: 1.4px solid var(--faint);
+  transform: rotate(45deg) translateY(-2px);
+}
+details[open] > summary::after {
+  transform: rotate(-135deg) translateY(-2px);
+}
+details[open] > summary {
+  margin-bottom: 10px;
+}
+details:not([open]) > summary .block-title {
+  margin-bottom: 0;
 }
 /* —— 亲亲那块 —— */
 .kiss-sum {

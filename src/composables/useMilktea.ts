@@ -76,49 +76,69 @@ export function useMilktea() {
     herId.value ? redeems.value.filter((e) => e.actor_id === herId.value) : []
   )
 
-  /** 本周免费额度用掉了没有 */
-  const freeUsedThisWeek = computed(() => {
-    const start = weekStart().getTime()
-    // 同理：免费额度也只认 source，不认人（他记的是 self，不会混进来）
-    return redeems.value.some(
-      (e) => e.meta?.source === 'free' && new Date(e.created_at).getTime() >= start
-    )
-  })
-  const freeRemaining = computed(() => (freeUsedThisWeek.value ? 0 : 1))
-
   /**
-   * 券列表：先发的在前，按 FIFO 和她的「用券核销」一一对应。
-   * 第 1 张券对应第 1 次用券核销，第 2 张对应第 2 次……这样每张券都能
-   * 说清「有没有用掉、什么时候用掉的」。
+   * 统一的模型：**「本周免费」不是另一种东西，它就是每周一凌晨自动发的一张券。**
+   * 所以这里把它推出来（不用定时任务），和他发的券放进同一个队列按颁发时间排。
+   * 本周那张是周一 00:00 发的，自然排在最前，于是自然"先扣免费、再用券"。
+   * 也不按人筛：两个人的角色是定死的（她喝、他发）。
    */
+  const isWeekly = (id: string) => id.startsWith('weekly-')
+
+  const weeklyVoucher = computed<MilkteaVoucher>(() => {
+    const fmt = (d: Date) =>
+      `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(
+        d.getDate()
+      ).padStart(2, '0')}`
+
+    const start = weekStart(new Date(nowTick.value))
+    const sunday = new Date(start)
+    sunday.setDate(start.getDate() + 6)
+
+    return {
+      id: `weekly-${fmt(start)}`,
+      issuedAt: start.toISOString(),
+      reason: '每周免费的一杯',
+      expiresAt: fmt(sunday),
+      usedAt: null,
+      usedFlavor: null,
+      expired: false
+    }
+  })
+
   const vouchers = computed<MilkteaVoucher[]>(() => {
     const issues = events.value
       .filter((e) => e.type === 'milktea_issue')
-      .sort((a, b) => a.created_at.localeCompare(b.created_at))
+      .map((ev) => {
+        const meta = (ev.meta ?? {}) as Record<string, unknown>
+        return {
+          id: ev.id,
+          issuedAt: ev.created_at,
+          reason: typeof meta.reason === 'string' ? meta.reason : '',
+          expiresAt: typeof meta.expires_at === 'string' ? meta.expires_at : null,
+          usedAt: null as string | null,
+          usedFlavor: null as string | null,
+          expired: false
+        }
+      })
 
-    /* 不按 actor 筛：两个人角色是定死的，source 是 voucher 就一定是用券的那次。
-       原来按 herRedeems 筛，早期角色判定错乱时留下的记录（actor 不是她）
-       会匹配不上 —— 就是「某杯写了用掉一张券、汇总却已用掉 0」的原因。 */
+    // 每周那张 + 他发的，一起排队（周一 00:00 那张最早，所以先被用掉）
+    const all = [weeklyVoucher.value, ...issues].sort((a, b) =>
+      a.issuedAt.localeCompare(b.issuedAt)
+    )
+
+    // 用掉的：所有不是"他自己喝的"核销，按时间先后一一对应
     const uses = redeems.value
-      .filter((e) => e.meta?.source === 'voucher')
+      .filter((e) => e.meta?.source !== 'self')
       .sort((a, b) => a.created_at.localeCompare(b.created_at))
 
     const now = nowTick.value
-
-    return issues.map((ev, i) => {
-      const meta = (ev.meta ?? {}) as Record<string, unknown>
-      const expiresAt = typeof meta.expires_at === 'string' ? meta.expires_at : null
+    return all.map((v, i) => {
       const use = uses[i] ?? null
-      const end = expiresEnd(expiresAt)
-
+      const end = expiresEnd(v.expiresAt)
       let usedFlavor: string | null = null
       if (use && use.meta && typeof use.meta.flavor === 'string') usedFlavor = use.meta.flavor
-
       return {
-        id: ev.id,
-        issuedAt: ev.created_at,
-        reason: typeof meta.reason === 'string' ? meta.reason : '',
-        expiresAt,
+        ...v,
         usedAt: use ? use.created_at : null,
         usedFlavor,
         expired: !use && end !== null && end < now
@@ -126,10 +146,19 @@ export function useMilktea() {
     })
   })
 
-  const issuedCount = computed(() => vouchers.value.length)
-  /** 可用券（没用掉、没过期） */
+  /** 集点格用：他发的券共有几张（每周那张单独占一格，不算在内） */
+  const issuedCount = computed(() => vouchers.value.filter((v) => !isWeekly(v.id)).length)
+
+  /** 本周那张免费券还在不在 */
+  const freeRemaining = computed(() => {
+    const w = vouchers.value.find((v) => isWeekly(v.id))
+    return w && !w.usedAt && !w.expired ? 1 : 0
+  })
+  const freeUsedThisWeek = computed(() => freeRemaining.value === 0)
+
+  /** 可用券（他发的、没用掉也没过期） */
   const voucherBalance = computed(
-    () => vouchers.value.filter((v) => !v.usedAt && !v.expired).length
+    () => vouchers.value.filter((v) => !isWeekly(v.id) && !v.usedAt && !v.expired).length
   )
   const vouchersUsed = computed(() => vouchers.value.filter((v) => !!v.usedAt).length)
   const vouchersExpired = computed(() => vouchers.value.filter((v) => v.expired).length)
