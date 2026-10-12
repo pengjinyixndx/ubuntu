@@ -49,6 +49,31 @@
         </li>
       </ul>
     </section>
+
+    <!-- 每一次喝，扣的到底是什么。没有这一块，余额一变根本无从判断 -->
+    <section class="block">
+      <h3 class="block-title">每一次喝</h3>
+
+      <p v-if="!drinks.length" class="empty">还没有喝过</p>
+
+      <ul v-else class="drinks">
+        <li v-for="d in drinks" :key="d.id" class="drink">
+          <span class="d-dot" :class="d.source"></span>
+          <div class="d-body">
+            <p class="d-line">
+              {{ d.who }} 喝了一杯
+              <span class="d-chips" v-if="d.chips.length">· {{ d.chips.join(' · ') }}</span>
+            </p>
+            <p class="d-sub">{{ stamp(d.at) }}</p>
+          </div>
+          <span class="d-how" :class="d.source">{{ d.how }}</span>
+        </li>
+      </ul>
+
+      <p class="foot-note">
+        这一周免费已经{{ freeRemaining ? '还有' : '用完' }}；券按先发先用，所以第几张券对应第几次用券。
+      </p>
+    </section>
   </PanelShell>
 </template>
 
@@ -61,10 +86,42 @@ import PanelShell from './PanelShell.vue'
 
 const emit = defineEmits<{ close: [] }>()
 const { loadEvents } = useFeed()
-const { vouchers, voucherBalance, vouchersUsed, vouchersExpired, freeRemaining } = useMilktea()
+const { vouchers, redeems, herId, voucherBalance, vouchersUsed, vouchersExpired, freeRemaining } =
+  useMilktea()
 
 /** 新的在前 */
 const orderedVouchers = computed(() => [...vouchers.value].reverse())
+
+/**
+ * 每一次喝：谁喝的、扣的是什么。
+ * 「他自己喝的」不占额度，标出来免得和用额度搞混。
+ */
+const drinks = computed(() =>
+  [...redeems.value]
+    .sort((a, b) => b.created_at.localeCompare(a.created_at))
+    .map((e) => {
+      const source = String(e.meta?.source ?? '')
+      const isHer = !!herId.value && e.actor_id === herId.value
+      const how =
+        source === 'free'
+          ? '用本周免费'
+          : source === 'voucher'
+            ? '用掉一张券'
+            : isHer
+              ? '她自己喝的'
+              : '他自己喝的'
+      return {
+        id: e.id,
+        at: e.created_at,
+        who: isHer ? '银杏叶' : '小螃蟹',
+        how,
+        source: source === 'voucher' ? 'voucher' : source === 'free' ? 'free' : 'self',
+        chips: [e.meta?.flavor, e.meta?.sweetness].filter(
+          (x): x is string => typeof x === 'string' && !!x
+        )
+      }
+    })
+)
 
 function stamp(iso: string | null): string {
   return iso ? dateTimeLabel(iso) : '—'
@@ -82,6 +139,75 @@ onMounted(() => {
 </script>
 
 <style scoped>
+/* —— 每一次喝 —— */
+.drinks {
+  display: flex;
+  flex-direction: column;
+  gap: 9px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.drink {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  padding: 10px 11px;
+  background-color: var(--paper);
+  border: var(--border-dashed);
+  border-radius: var(--r-sm);
+}
+.d-dot {
+  flex-shrink: 0;
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background-color: var(--faint);
+}
+.d-dot.free {
+  background-color: var(--caramel);
+}
+.d-dot.voucher {
+  background-color: var(--brick);
+}
+.d-body {
+  flex: 1;
+  min-width: 0;
+}
+.d-line {
+  margin: 0;
+  font-family: var(--font-song);
+  font-size: var(--fs-sm);
+  color: var(--ink);
+}
+.d-chips {
+  color: var(--muted);
+}
+.d-sub {
+  margin: 3px 0 0;
+  font-family: var(--font-typewriter);
+  font-size: var(--fs-xs);
+  color: var(--faint);
+}
+.d-how {
+  flex-shrink: 0;
+  font-family: var(--font-song);
+  font-size: var(--fs-xs);
+  color: var(--muted);
+}
+.d-how.free {
+  color: var(--caramel);
+}
+.d-how.voucher {
+  color: var(--brick);
+}
+.foot-note {
+  margin: 12px 0 0;
+  font-family: var(--font-song);
+  font-size: var(--fs-xs);
+  line-height: 1.8;
+  color: var(--faint);
+}
 .summary {
   display: flex;
   gap: 8px;

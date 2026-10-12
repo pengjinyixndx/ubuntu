@@ -167,6 +167,8 @@ export function useMilktea() {
     iAmHer,
     issuedCount,
     vouchers,
+    /** 所有喝奶茶的记录（明细里要讲清"每一次扣的是什么"） */
+    redeems,
     voucherBalance,
     vouchersUsed,
     vouchersExpired,
