@@ -37,7 +37,7 @@
 </template>
 
 <script setup lang="ts">
-import { onMounted, onUnmounted, ref } from 'vue'
+import { onMounted, onUnmounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { Home, PenLine, HeartHandshake, User } from 'lucide-vue-next'
 import { usePetition } from '../composables/usePetition'
@@ -50,7 +50,21 @@ import KissAskModal from '../components/KissAskModal.vue'
 const route = useRoute()
 const router = useRouter()
 
-const { needConflictPopup, loadPetition } = usePetition()
+const { needConflictPopup, openConflict, loadPetition } = usePetition()
+
+/* 一份矛盾里：两份都写完的那一刻（status 变成 active）就要弹，
+   不能只在打开 App 时才检查。同一个会话里处理过就不再反复弹。 */
+const shownConflicts = ref<string[]>([])
+watch(
+  needConflictPopup,
+  (need) => {
+    const c = openConflict.value
+    if (!need || !c || shownConflicts.value.includes(c.id)) return
+    shownConflicts.value.push(c.id)
+    showConflict.value = true
+  },
+  { immediate: true }
+)
 const { loadEvents, lastLocalWriteAt } = useFeed()
 let unsub: (() => void) | null = null
 
@@ -80,9 +94,7 @@ const switchTab = (path: string) => {
 }
 
 onMounted(async () => {
-  // 每次打开青桃都自查一次：还在吵架期间就弹出来
   await loadPetition()
-  if (needConflictPopup.value) showConflict.value = true
 
   // 实时：对方一发东西，这边立刻刷新（不用等他自己刷新）
   unsub = subscribeChanges({

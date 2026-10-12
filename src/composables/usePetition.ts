@@ -269,7 +269,10 @@ const pendingRequests = computed(() => requests.value.filter((x) => x.status ===
   })
 
   /** 需要弹窗（吵架期间：双方都填完且状态是 active） */
-  const needConflictPopup = computed(() => openConflict.value?.status === 'active')
+  /* 还在吵架、或者上次选了冷静 —— 两种情况都要弹（规则里写了：冷静不算结束） */
+  const needConflictPopup = computed(
+    () => openConflict.value?.status === 'active' || openConflict.value?.status === 'calm'
+  )
 
   async function startConflict() {
     const src = await getFeedSource()
