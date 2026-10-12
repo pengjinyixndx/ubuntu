@@ -39,7 +39,8 @@
     </section>
 
     <!-- 等她点头 / 等他的回话 -->
-    <section v-if="pendingKisses.length" class="block">
+    <!-- 他才是答应的人 -->
+    <section v-if="!iAmHer && pendingKisses.length" class="block">
       <h3 class="block-title">等你说好</h3>
       <ul class="list">
         <li v-for="k in pendingKisses" :key="k.id" class="row">
@@ -90,12 +91,14 @@ import { Camera, X } from 'lucide-vue-next'
 import type { Kiss } from '../types/domain'
 import { usePetition } from '../composables/usePetition'
 import { useFeed } from '../composables/useFeed'
+import { useMilktea } from '../composables/useMilktea'
 import { actorLabel, timeLabel } from '../lib/eventLabels'
 import PanelShell from './PanelShell.vue'
 import PhotoPicker from './PhotoPicker.vue'
 
 const emit = defineEmits<{ close: [] }>()
 const { myProfile, uploadPhoto } = useFeed()
+const { iAmHer } = useMilktea()
 const {
   freeLeftToday,
   kissDebt,

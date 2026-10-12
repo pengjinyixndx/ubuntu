@@ -182,7 +182,7 @@ const router = useRouter()
 const { events, myProfile, loading, loadEvents, resetFeed } = useFeed()
 const { wishList, kissDebt, pendingKisses, pendingRequests, conflicts, conflictNotes, loadPetition, resetPetition } =
   usePetition()
-const { vouchers } = useMilktea()
+const { vouchers, iAmHer } = useMilktea()
 
 /** 七天内想做、还没完成的心愿 */
 const soonWishes = computed(() => {
@@ -216,6 +216,9 @@ interface Todo {
 }
 const todos = computed<Todo[]>(() => {
   const out: Todo[] = []
+  // 待办是「等我做的事」：她负责讨、他负责发，所以只有他这边有得等
+
+
   for (const k of pendingKisses.value) {
     out.push({ key: `k${k.id}`, text: `${actorLabel(k.requester, myProfile.value?.id ?? '', myProfile.value?.gender)} 想亲你，等你的回话`, panel: 'kiss' })
   }

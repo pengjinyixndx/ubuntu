@@ -85,12 +85,9 @@ export function usePetition() {
   }
 
   /* ============ 奶茶券 ============ */
-  /* 只算「对方递过来、等我回」的。
-   原来漏了 requester 判断，结果她自己的请求也出现在「等她点头」里，
-   于是她能同意自己递的申请（你测出来的那个）。 */
-const pendingRequests = computed(() =>
-  requests.value.filter((x) => x.status === 'pending' && x.requester !== myId.value)
-)
+  /* 两个人是定死的：她讨、他发。所以「待处理」就是全部待处理的，
+   由界面按角色决定给谁看 —— 不需要在数据里筛人。 */
+const pendingRequests = computed(() => requests.value.filter((x) => x.status === 'pending'))
   const myRequests = computed(() => requests.value.filter((x) => x.requester === myId.value))
 
   async function requestMilktea(reason: string) {
@@ -158,9 +155,8 @@ const pendingRequests = computed(() =>
       .reduce((s, k) => s + k.count, 0)
   )
   /** 待我同意的亲亲请求（对方发的） */
-  const pendingKisses = computed(() =>
-    kisses.value.filter((k) => k.status === 'pending' && k.requester !== myId.value)
-  )
+  /* 同理：亲亲也是她请求、他答应，界面按角色分，不在这儿筛人 */
+  const pendingKisses = computed(() => kisses.value.filter((k) => k.status === 'pending'))
   /** 我发出去还没被处理的 */
   const myPendingKisses = computed(() =>
     kisses.value.filter((k) => k.status === 'pending' && k.requester === myId.value)

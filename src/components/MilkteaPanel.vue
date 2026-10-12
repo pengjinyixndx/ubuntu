@@ -30,7 +30,8 @@
     </section>
 
     <!-- 她递过来的 -->
-    <section v-if="pendingRequests.length" class="block">
+    <!-- 她是讨的人，这一块只给发的人看 -->
+    <section v-if="!iAmHer && pendingRequests.length" class="block">
       <h3 class="block-title">她递过来的</h3>
       <ul class="list">
         <li v-for="r in pendingRequests" :key="r.id" class="row">
