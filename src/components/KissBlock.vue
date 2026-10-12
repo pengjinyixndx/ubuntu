@@ -17,7 +17,8 @@
     </div>
 
     <p class="foot">
-      <span>欠着的亲亲 <b>{{ kissDebt + pending }}</b> 个</span>
+      <span v-if="iAmHer">小螃蟹欠你 <b>{{ kissDebt + pending }}</b> 个亲亲</span>
+      <span v-else>你欠银杏叶 <b>{{ kissDebt + pending }}</b> 个亲亲</span>
       <span v-if="iAmHer" class="dot">·</span>
       <span v-if="iAmHer">今天还能点 <b>{{ leftNow }}</b> 次</span>
     </p>

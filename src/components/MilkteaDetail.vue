@@ -1,5 +1,5 @@
 <template>
-  <PanelShell title="奶茶券明细" @close="emit('close')">
+  <PanelShell title="奶茶券和亲亲" @close="emit('close')">
     <!-- 汇总 -->
     <section class="summary">
       <div class="cell">
@@ -74,6 +74,32 @@
         这一周免费已经{{ freeRemaining ? '还有' : '用完' }}；券按先发先用，所以第几张券对应第几次用券。
       </p>
     </section>
+    <!-- 亲亲：欠账、额度、以及每一次请求和同意情况 -->
+    <section class="block">
+      <h3 class="block-title">亲亲</h3>
+
+      <p class="kiss-sum">
+        <span v-if="iAmHer">小螃蟹欠你 <b>{{ kissDebt }}</b> 个亲亲</span>
+        <span v-else>你欠银杏叶 <b>{{ kissDebt }}</b> 个亲亲</span>
+        <span v-if="iAmHer" class="kiss-left">· 今天还能点 {{ freeLeftToday }} 次</span>
+      </p>
+
+      <p v-if="!kissRows.length" class="empty">还没有要过亲亲</p>
+
+      <ul v-else class="drinks">
+        <li v-for="k in kissRows" :key="k.id" class="drink">
+          <span class="d-dot" :class="k.tone"></span>
+          <div class="d-body">
+            <p class="d-line">
+              {{ k.who }} 要了 {{ k.count }} 个亲亲
+              <span v-if="k.reason" class="d-chips">· {{ k.reason }}</span>
+            </p>
+            <p class="d-sub">{{ k.at }}</p>
+          </div>
+          <span class="d-how" :class="k.tone">{{ k.state }}</span>
+        </li>
+      </ul>
+    </section>
   </PanelShell>
 </template>
 
@@ -81,13 +107,15 @@
 import { computed, onMounted } from 'vue'
 import { useMilktea } from '../composables/useMilktea'
 import { useFeed } from '../composables/useFeed'
+import { usePetition } from '../composables/usePetition'
 import { dateTimeLabel } from '../lib/eventLabels'
 import PanelShell from './PanelShell.vue'
 
 const emit = defineEmits<{ close: [] }>()
 const { loadEvents } = useFeed()
-const { vouchers, redeems, herId, voucherBalance, vouchersUsed, vouchersExpired, freeRemaining } =
+const { vouchers, redeems, herId, iAmHer, voucherBalance, vouchersUsed, vouchersExpired, freeRemaining } =
   useMilktea()
+const { kisses, kissDebt, freeLeftToday } = usePetition()
 
 /** 新的在前 */
 const orderedVouchers = computed(() => [...vouchers.value].reverse())
@@ -123,6 +151,34 @@ const drinks = computed(() =>
     })
 )
 
+/**
+ * 亲亲的每一次请求，以及同意情况。
+ * 两个人的角色是定死的：她请求、他答应，所以"谁"这里也写死。
+ */
+const kissRows = computed(() =>
+  [...kisses.value]
+    .sort((a, b) => b.created_at.localeCompare(a.created_at))
+    .map((k) => {
+      const state =
+        k.status === 'free'
+          ? '本周免费'
+          : k.status === 'pending'
+            ? '等他回'
+            : k.status === 'approved'
+              ? '已同意'
+              : '已驳回'
+      return {
+        id: k.id,
+        who: '银杏叶',
+        count: k.count,
+        reason: k.reason ?? '',
+        at: dateTimeLabel(k.created_at),
+        state,
+        /** 红色只给"还悬着"的（等回话 / 被驳回），其余用暖色 */
+        tone: k.status === 'pending' || k.status === 'rejected' ? 'voucher' : 'free'
+      }
+    })
+)
 function stamp(iso: string | null): string {
   return iso ? dateTimeLabel(iso) : '—'
 }
@@ -207,6 +263,22 @@ onMounted(() => {
   font-size: var(--fs-xs);
   line-height: 1.8;
   color: var(--faint);
+}
+/* —— 亲亲那块 —— */
+.kiss-sum {
+  margin: 0 0 11px;
+  font-family: var(--font-song);
+  font-size: var(--fs-sm);
+  color: var(--ink);
+}
+.kiss-sum b {
+  font-family: var(--font-serif);
+  font-size: var(--fs-md);
+  color: var(--brick);
+}
+.kiss-left {
+  color: var(--muted);
+  font-size: var(--fs-xs);
 }
 .summary {
   display: flex;

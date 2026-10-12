@@ -67,20 +67,6 @@
       </ul>
     </section>
 
-    <!-- 欠着的，可以兑现 -->
-    <section v-if="owed.length" class="block">
-      <h3 class="block-title">欠着的</h3>
-      <ul class="list">
-        <li v-for="k in owed" :key="k.id" class="row">
-          <div class="row-body">
-            <p class="row-main">{{ who(k.requester) }} 的 {{ k.count }} 个亲亲</p>
-            <p class="row-time">{{ time(k.created_at) }}</p>
-          </div>
-          <button type="button" class="btn ghost" @click="redeem(k.id)">亲过了</button>
-        </li>
-      </ul>
-    </section>
-
     <PhotoPicker ref="picker" @picked="onPicked" />
   </PanelShell>
 </template>
