@@ -79,7 +79,8 @@ export function useMilktea() {
   /** 本周免费额度用掉了没有 */
   const freeUsedThisWeek = computed(() => {
     const start = weekStart().getTime()
-    return herRedeems.value.some(
+    // 同理：免费额度也只认 source，不认人（他记的是 self，不会混进来）
+    return redeems.value.some(
       (e) => e.meta?.source === 'free' && new Date(e.created_at).getTime() >= start
     )
   })
@@ -95,7 +96,10 @@ export function useMilktea() {
       .filter((e) => e.type === 'milktea_issue')
       .sort((a, b) => a.created_at.localeCompare(b.created_at))
 
-    const uses = herRedeems.value
+    /* 不按 actor 筛：两个人角色是定死的，source 是 voucher 就一定是用券的那次。
+       原来按 herRedeems 筛，早期角色判定错乱时留下的记录（actor 不是她）
+       会匹配不上 —— 就是「某杯写了用掉一张券、汇总却已用掉 0」的原因。 */
+    const uses = redeems.value
       .filter((e) => e.meta?.source === 'voucher')
       .sort((a, b) => a.created_at.localeCompare(b.created_at))
 
