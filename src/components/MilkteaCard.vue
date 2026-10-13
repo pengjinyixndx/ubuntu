@@ -17,8 +17,9 @@
 
     <!-- 集点格：1 个免费格 + 颁发的券格，盖过章的是用掉的 -->
     <div class="slots">
-      <span class="slot slot-free" :class="{ done: !freeRemaining }" title="本周免费">
+      <span class="slot slot-free" :class="{ done: !freeRemaining }" :style="weekWear" title="每周免费的一杯">
         <CupSoda :size="15" :stroke-width="1.8" />
+        <i v-if="!freeRemaining" class="straw" aria-hidden="true"></i>
       </span>
       <span
         v-for="n in issuedCount"
@@ -28,6 +29,7 @@
         title="奶茶券"
       >
         <CupSoda :size="15" :stroke-width="1.8" />
+        <i v-if="n <= vouchersUsed" class="straw" aria-hidden="true"></i>
       </span>
     </div>
 
@@ -44,7 +46,7 @@
 </template>
 
 <script setup lang="ts">
-import { onMounted } from 'vue'
+import { computed, onMounted } from 'vue'
 import { CupSoda, ChevronRight } from 'lucide-vue-next'
 import { useMilktea } from '../composables/useMilktea'
 import { useFeed } from '../composables/useFeed'
@@ -59,6 +61,19 @@ const emit = defineEmits<{ open: [] }>()
 
 const { drinkable, freeRemaining, voucherBalance, issuedCount, vouchersUsed } = useMilktea()
 
+/**
+ * 每周那张券会"随着一周过去慢慢变旧"：
+ * 周一刚发下来是新的，到周末纸就发黄发淡了。时间用纸的颜色表现，不写文字。
+ */
+const weekWear = computed(() => {
+  const day = (new Date().getDay() + 6) % 7 // 周一 0 … 周日 6
+  const worn = day / 6
+  return {
+    filter: `sepia(${(worn * 0.35).toFixed(2)}) saturate(${(1 - worn * 0.25).toFixed(2)})`,
+    opacity: String((1 - worn * 0.22).toFixed(2))
+  }
+})
+
 // 奶茶卡是靠 events 推出来的，直接进记录页时 events 可能还没拉，这里兜一下
 const { events, loadEvents } = useFeed()
 onMounted(() => {
@@ -67,6 +82,23 @@ onMounted(() => {
 </script>
 
 <style scoped>
+/* —— 喝过的杯子会留一道吸管痕 —— */
+.slot {
+  position: relative;
+}
+.straw {
+  position: absolute;
+  left: 50%;
+  top: 2px;
+  width: 2px;
+  height: 16px;
+  margin-left: 3px;
+  background-color: var(--caramel);
+  opacity: 0.75;
+  transform: rotate(14deg);
+  border-radius: 1px;
+}
+
 .mcard {
   position: relative;
   padding: 16px 16px 14px;

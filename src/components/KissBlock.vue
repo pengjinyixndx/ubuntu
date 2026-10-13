@@ -2,7 +2,14 @@
   <section class="kiss-block">
     <!-- 小螃蟹（他）——「想亲」只对她有意义，所以只有她看得到 -->
     <div class="person">
-      <Critter kind="crab" :size="30" class="face" />
+      <span
+        class="crab-wrap"
+        :class="{ hit: reacting, dizzy: leftNow === 0 }"
+        :style="{ '--blush': blush }"
+      >
+        <Critter kind="crab" :size="30" class="face" />
+        <i class="blush" aria-hidden="true"></i>
+      </span>
       <span class="who">小螃蟹</span>
       <button v-if="iAmHer" type="button" class="ask" @click="tap">
         <Heart :size="14" :stroke-width="2" :fill="pending ? 'currentColor' : 'none'" />
@@ -55,6 +62,24 @@ const { iAmHer } = useMilktea()
 const FREE_WINDOW_MS = 10000
 
 const pending = ref(0)
+/** 被亲一下：晃一下（把动画重放） */
+const reacting = ref(false)
+let hitTimer = 0
+function react() {
+  reacting.value = false
+  window.clearTimeout(hitTimer)
+  hitTimer = window.setTimeout(() => {
+    reacting.value = true
+    hitTimer = window.setTimeout(() => {
+      reacting.value = false
+    }, 460)
+  }, 12)
+}
+/** 今天已经被亲了几次（越多次，它脸越红） */
+const blush = computed(() => {
+  const used = Math.min(10, Math.max(0, 10 - freeLeftToday.value))
+  return (used / 10) * 0.85
+})
 const askGo = ref(false)
 let timer = 0
 
@@ -68,6 +93,7 @@ function bump() {
 const leftNow = computed(() => Math.max(0, freeLeftToday.value - pending.value))
 
 function tap() {
+  react()
   // 暂停期间不亲：把和好入口叫出来
   if (inPause.value) {
     pauseOpen.value = true
@@ -105,6 +131,51 @@ onUnmounted(() => {
 </script>
 
 <style scoped>
+/* —— 小螃蟹会被亲到 —— */
+.crab-wrap {
+  position: relative;
+  display: inline-flex;
+  flex-shrink: 0;
+}
+.crab-wrap.hit {
+  animation: crab-hit 0.46s cubic-bezier(0.16, 1, 0.3, 1);
+}
+@keyframes crab-hit {
+  0% {
+    transform: translateX(0) rotate(0) scale(1);
+  }
+  35% {
+    transform: translateX(-5px) rotate(-10deg) scale(1.14);
+  }
+  100% {
+    transform: translateX(0) rotate(0) scale(1);
+  }
+}
+/* 十次用完：它已经被亲晕了，慢慢晃 */
+.crab-wrap.dizzy {
+  animation: crab-dizzy 1.8s ease-in-out infinite;
+}
+@keyframes crab-dizzy {
+  0%, 100% {
+    transform: rotate(-3deg);
+  }
+  50% {
+    transform: rotate(3deg);
+  }
+}
+.blush {
+  position: absolute;
+  left: 50%;
+  top: 58%;
+  width: 26px;
+  height: 16px;
+  margin-left: -13px;
+  border-radius: 50%;
+  background: radial-gradient(circle, rgba(200, 78, 58, 0.9), rgba(200, 78, 58, 0) 72%);
+  opacity: var(--blush, 0);
+  transition: opacity 0.35s ease;
+  pointer-events: none;
+}
 .kiss-block {
   padding: 12px 14px;
   background-color: var(--photo);
