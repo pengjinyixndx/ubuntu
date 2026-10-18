@@ -349,7 +349,11 @@ function onImgError(e: Event) {
   background-color: var(--paper-deep);
 }
 .note-photo img {
+  display: block;
   width: 100%;
+  height: auto;
+  max-height: 260px;
+  object-fit: contain;
 }
 
 .photo-cap {
