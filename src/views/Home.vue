@@ -125,11 +125,21 @@ const dragDx = ref(0)
 const isDragging = ref(false)
 const detailEvent = ref<CoupleEvent | null>(null)
 
+/* 量可用高度。
+   注意：手机浏览器的地址栏会随滚动伸缩（安卓 Chrome 最明显），
+   resize 会不停触发、可用高度一直在变 —— 卡片的最高高度跟着变，
+   看起来就是卡片闪烁、版面一直往上拉。
+   所以：抖动不到 32px 当作没变，并且 resize 去抖。 */
+let measureTimer = 0
 function measure() {
   if (!feedRef.value) return
   W.value = feedRef.value.clientWidth
-  // 树枝下沿 44 + 垂茎 110 + 底部留白 10
-  cardMax.value = Math.max(150, feedRef.value.clientHeight - 44 - 110 - 10)
+  const next = Math.max(150, feedRef.value.clientHeight - 44 - 110 - 10)
+  if (cardMax.value === 260 || Math.abs(next - cardMax.value) >= 32) cardMax.value = next
+}
+function onResize() {
+  window.clearTimeout(measureTimer)
+  measureTimer = window.setTimeout(measure, 180)
 }
 
 const feedStyle = computed(() => {
@@ -238,14 +248,17 @@ function onWheel(e: WheelEvent) {
 
 onMounted(async () => {
   measure()
-  window.addEventListener('resize', measure)
+  window.addEventListener('resize', onResize)
   await loadEvents()
   await nextTick()
   measure() // 卡片渲染出来之后再量一次，此时 .feed 才有真实高度
   activeIndex.value = 0
 })
 
-onUnmounted(() => window.removeEventListener('resize', measure))
+onUnmounted(() => {
+  window.removeEventListener('resize', onResize)
+  window.clearTimeout(measureTimer)
+})
 </script>
 
 <style scoped>
