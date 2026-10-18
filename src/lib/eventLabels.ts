@@ -5,21 +5,23 @@ export function actorLabel(
   actorId: string,
   myId: string,
   myGender: Gender | null | undefined,
-  partnerId?: string | null
+  partnerId?: string | null,
+  partnerGender?: Gender | null
 ): string {
-  if (actorId === myId) return '我'
-
-  const other = myGender === 'female' ? '他' : '她'
-
+  /* 只用性别判断"是不是我"（两个账号的性别是确定的）。
+     内容的归属仍然看 id，这里只是显示。
+     1) 先弄清发布者是两个人的哪一位，取到 ta 的性别
+     2) 性别和我一致 → 我
+     3) 不一致 → 按发布者的性别显示 他 / 她 */
+  let actorGender: Gender | null | undefined
   if (partnerId) {
-    if (actorId === partnerId) return other
-    /* 只有两个人的空间：既不是我、也不是对方的 id，就当成自己。
-       以前这里直接按性别返回"对方"，结果她自己的记录被写成了「他」。 */
-    return '我'
+    actorGender = actorId === partnerId ? partnerGender : myGender
   }
 
-  if (myGender === 'male' || myGender === 'female') return other
-  return '对方'
+  if (actorGender && myGender && actorGender === myGender) return '我'
+
+  const g = actorGender ?? (myGender === 'female' ? 'male' : 'female')
+  return g === 'female' ? '她' : '他'
 }
 
 /** 各事件类型在抬头里的动作短语 */
