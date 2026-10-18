@@ -52,7 +52,7 @@ async function loadDrawable(file: File): Promise<Drawable | null> {
 /**
  * 压小一张图片。压不了（格式怪、浏览器不支持）就原样返回，绝不让功能卡死。
  */
-export async function shrinkImage(file: File, maxSide = 1600, quality = 0.82, always = false): Promise<File> {
+export async function shrinkImage(file: File, maxSide = 1440, quality = 0.8, always = false): Promise<File> {
   if (!file.type.startsWith('image/')) return file
   // 本来就不大，不折腾
   if (!always && file.size <= 700 * 1024) return file

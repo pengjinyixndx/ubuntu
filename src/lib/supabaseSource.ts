@@ -165,19 +165,24 @@ export const supabaseSource: FeedSource = {
       return { url: null, error }
     }
 
-    /* 再传一张缩略图（同一个目录、文件名多 -t）。
-       失败了不影响主流程：显示端拿不到小图会自己退回原图。 */
-    try {
-      const thumb = await makeThumb(file)
-      const dot = path.lastIndexOf('.')
-      const thumbPath = dot > 0 ? `${path.slice(0, dot)}-t.jpg` : `${path}-t.jpg`
-      await supabase.storage.from(BUCKET).upload(thumbPath, thumb, {
-        cacheControl: '31536000',
-        upsert: true
-      })
-    } catch {
-      /* 缩略图只是加速，失败就算了 */
-    }
+    /* 缩略图在后台补传，**不阻塞发布**。
+       原来这里是 await：每张图要解码两次、编码两次、传两次才发得出去，
+       她那边（旧一点的 iPhone）上传因此明显变慢。
+       缩略图只是给列表加速用的，晚一两秒没关系；
+       万一没传上去，显示端会自己退回原图。 */
+    const dot = path.lastIndexOf('.')
+    const thumbPath = dot > 0 ? `${path.slice(0, dot)}-t.jpg` : `${path}-t.jpg`
+    void (async () => {
+      try {
+        const thumb = await makeThumb(file)
+        await supabase.storage.from(BUCKET).upload(thumbPath, thumb, {
+          cacheControl: '31536000',
+          upsert: true
+        })
+      } catch {
+        /* 只是加速，失败就算了 */
+      }
+    })()
 
     const { data } = supabase.storage.from(BUCKET).getPublicUrl(path)
     return { url: data.publicUrl, error: null }
