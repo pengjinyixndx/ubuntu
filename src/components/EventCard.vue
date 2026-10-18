@@ -116,6 +116,7 @@ import { actorLabel, ACTION_LABELS, kissAction, timeLabel, milkteaAction } from 
 import { WEATHERS, MOODS, labelOfKey } from '../lib/options'
 import Critter from './Critter.vue'
 import { usePetition } from '../composables/usePetition'
+import { useFeed } from '../composables/useFeed'
 import { thumbUrlOf, onImageError, IMAGE_PLACEHOLDER } from '../lib/image'
 
 const props = defineProps<{
@@ -139,7 +140,10 @@ const ICONS = {
 }
 
 const icon = computed(() => ICONS[props.event.type])
-const actor = computed(() => actorLabel(props.event.actor_id, props.me.id, props.me.gender))
+const { partnerProfile } = useFeed()
+const actor = computed(() =>
+  actorLabel(props.event.actor_id, props.me.id, props.me.gender, partnerProfile.value?.id)
+)
 const action = computed(() => {
   if (props.event.type === 'milktea_redeem') return milkteaAction(props.event.meta?.source)
   if (props.event.type === 'kiss') return kissAction(props.event.meta)
@@ -325,23 +329,23 @@ function onImgError(e: Event) {
 }
 
 .content-text {
-  flex: 0 0 auto; /* 正文绝不被压缩——压了就会看着像被照片盖住 */
+  flex: 0 0 auto;
   margin: 0;
+  /* 不用 -webkit-line-clamp：Safari 上它和 flex 一起会不停重算，
+     表现就是"字多的卡片一直闪"。改成定高 + 溢出裁切，效果一样但不重排。 */
+  max-height: 9.75em; /* 1.95 行高 × 5 行 */
   font-family: var(--font-song);
   font-size: var(--fs-base);
   line-height: 1.95;
   color: var(--ink-soft);
   white-space: pre-wrap;
   word-break: break-word;
-  display: -webkit-box;
-  -webkit-line-clamp: 5;
-  -webkit-box-orient: vertical;
   overflow: hidden;
 }
 
 /* 带随手拍时，正文只留 2 行，把版面让给照片 */
 .feed-card.has-photo .content-text {
-  -webkit-line-clamp: 2;
+  max-height: 3.9em; /* 1.95 × 2 行 */
 }
 
 /* 带照片的卡片撑满可用高度，剩下的空间全给照片 */

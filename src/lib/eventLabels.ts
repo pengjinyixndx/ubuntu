@@ -1,10 +1,24 @@
 import type { EventType, Gender } from '../types/domain'
 
 /** 卡片抬头里的发布者称呼：自己=「我」；对方按自己性别显示「他 / 她」 */
-export function actorLabel(actorId: string, myId: string, myGender: Gender | null | undefined): string {
+export function actorLabel(
+  actorId: string,
+  myId: string,
+  myGender: Gender | null | undefined,
+  partnerId?: string | null
+): string {
   if (actorId === myId) return '我'
-  if (myGender === 'male') return '她'
-  if (myGender === 'female') return '他'
+
+  const other = myGender === 'female' ? '他' : '她'
+
+  if (partnerId) {
+    if (actorId === partnerId) return other
+    /* 只有两个人的空间：既不是我、也不是对方的 id，就当成自己。
+       以前这里直接按性别返回"对方"，结果她自己的记录被写成了「他」。 */
+    return '我'
+  }
+
+  if (myGender === 'male' || myGender === 'female') return other
   return '对方'
 }
 

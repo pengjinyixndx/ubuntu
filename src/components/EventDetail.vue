@@ -125,7 +125,10 @@ const ICONS = {
 }
 
 const icon = computed(() => ICONS[props.event.type])
-const actor = computed(() => actorLabel(props.event.actor_id, props.me.id, props.me.gender))
+const { partnerProfile } = useFeed()
+const actor = computed(() =>
+  actorLabel(props.event.actor_id, props.me.id, props.me.gender, partnerProfile.value?.id)
+)
 const action = computed(() => {
   if (props.event.type === 'milktea_redeem') return milkteaAction(props.event.meta?.source)
   if (props.event.type === 'kiss') return kissAction(props.event.meta)
