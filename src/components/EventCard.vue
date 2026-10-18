@@ -12,7 +12,7 @@
       <!-- 照片：整组 -->
       <div v-if="event.type === 'photo'" class="photo-grid">
         <div v-for="(url, i) in visiblePhotos" :key="i" class="photo-cell">
-          <img :src="thumbUrlOf(url)" :data-full="url" alt="照片" loading="lazy" decoding="async" @error="onImageError" />
+          <img :src="imgSrcFor(url)" :data-full="url" alt="照片" loading="lazy" decoding="async" @error="onImgFail($event, url)" />
           <span v-if="i === 2 && restCount > 0" class="photo-more">+{{ restCount }}</span>
         </div>
       </div>
@@ -34,7 +34,7 @@
         </div>
         <p v-if="event.content" class="content-text">{{ event.content }}</p>
         <div v-if="singlePhoto" class="note-photo">
-          <img :src="thumbUrlOf(singlePhoto)" :data-full="singlePhoto" alt="这一杯" loading="lazy" decoding="async" @error="onImageError" />
+          <img :src="imgSrcFor(singlePhoto)" :data-full="singlePhoto" alt="这一杯" loading="lazy" decoding="async" @error="onImgFail($event, singlePhoto)" />
         </div>
       </div>
 
@@ -81,7 +81,7 @@
         <p v-if="event.content" class="content-text">{{ event.content }}</p>
         <!-- 随笔可选带一张随手拍 -->
         <div v-if="singlePhoto" class="note-photo">
-          <img :src="thumbUrlOf(singlePhoto)" :data-full="singlePhoto" alt="随手拍" loading="lazy" decoding="async" @error="onImageError" />
+          <img :src="imgSrcFor(singlePhoto)" :data-full="singlePhoto" alt="随手拍" loading="lazy" decoding="async" @error="onImgFail($event, singlePhoto)" />
         </div>
       </template>
 
@@ -116,7 +116,7 @@ import { actorLabel, ACTION_LABELS, kissAction, timeLabel, milkteaAction } from 
 import { WEATHERS, MOODS, labelOfKey } from '../lib/options'
 import Critter from './Critter.vue'
 import { usePetition } from '../composables/usePetition'
-import { thumbUrlOf, onImageError } from '../lib/image'
+import { thumbUrlOf, onImageError, IMAGE_PLACEHOLDER } from '../lib/image'
 
 const props = defineProps<{
   event: CoupleEvent
@@ -149,6 +149,28 @@ const isText = computed(() => ['note', 'diary', 'wish'].includes(props.event.typ
 const isTicket = computed(() => props.event.type === 'milktea_issue')
 const isTea = computed(() => props.event.type === 'milktea_redeem')
 const isKiss = computed(() => props.event.type === 'kiss')
+
+/* 图片取不到时**记住**，别再重试。
+   以前是改 img.src 兜底，但组件每次重新渲染会把 src 绑回坏地址，
+   于是失败—占位—重绑—再失败，一直闪。改成由状态决定显示什么。 */
+const failedUrls = ref<string[]>([])
+function imgSrcFor(url: string): string {
+  if (!url) return IMAGE_PLACEHOLDER
+  return failedUrls.value.includes(url) ? IMAGE_PLACEHOLDER : thumbUrlOf(url)
+}
+function markFailed(url: string): void {
+  if (url && !failedUrls.value.includes(url)) failedUrls.value.push(url)
+}
+/* 缩略图失败先退回原图（一次），原图也失败才用占位 */
+function onImgFail(e: Event, url: string): void {
+  const img = e.currentTarget as HTMLImageElement
+  if (img.dataset.fallback !== '1' && img.src !== url) {
+    img.dataset.fallback = '1'
+    img.src = url
+    return
+  }
+  markFailed(url)
+}
 
 /* 暂停期间、且是对方发的：标一句这是暂停之前发的，不指责只说事实 */
 const { needConflictPopup: inPause } = usePetition()

@@ -138,7 +138,8 @@ export function thumbUrlOf(url: string): string {
   return url.replace(/\.(jpe?g|png|webp)$/i, '-t.jpg')
 }
 
-const PLACEHOLDER =
+export const IMAGE_PLACEHOLDER =
+  
   'data:image/svg+xml;utf8,' +
   encodeURIComponent(
     `<svg xmlns="http://www.w3.org/2000/svg" width="400" height="300"><rect width="100%" height="100%" fill="#f3ead4"/><g fill="none" stroke="#98663a" stroke-width="2"><rect x="165" y="112" width="70" height="52"/><circle cx="180" cy="128" r="5"/><path d="M165 164 L190 134 L215 164"/></g><text x="200" y="205" font-family="serif" font-size="15" fill="#b3a588" text-anchor="middle">暂无图片</text></svg>`
@@ -156,5 +157,5 @@ export function onImageError(e: Event): void {
     img.src = full
     return
   }
-  if (img.src !== PLACEHOLDER) img.src = PLACEHOLDER
+  if (img.src !== IMAGE_PLACEHOLDER) img.src = IMAGE_PLACEHOLDER
 }
