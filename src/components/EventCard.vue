@@ -12,7 +12,7 @@
       <!-- 照片：整组 -->
       <div v-if="event.type === 'photo'" class="photo-grid">
         <div v-for="(url, i) in visiblePhotos" :key="i" class="photo-cell">
-          <img :src="imgSrcFor(url)" :data-full="url" alt="照片" decoding="async" @error="onImgFail($event, url)" />
+          <img :src="imgSrcFor(url)" :data-full="url" alt="照片" loading="lazy" decoding="async" @error="onImgFail($event, url)" />
           <span v-if="i === 2 && restCount > 0" class="photo-more">+{{ restCount }}</span>
         </div>
       </div>
@@ -34,7 +34,7 @@
         </div>
         <p v-if="event.content" class="content-text">{{ event.content }}</p>
         <div v-if="singlePhoto" class="note-photo">
-          <img :src="imgSrcFor(singlePhoto)" :data-full="singlePhoto" alt="这一杯" decoding="async" @error="onImgFail($event, singlePhoto)" />
+          <img :src="imgSrcFor(singlePhoto)" :data-full="singlePhoto" alt="这一杯" loading="lazy" decoding="async" @error="onImgFail($event, singlePhoto)" />
         </div>
       </div>
 
@@ -66,7 +66,7 @@
             :src="thumbUrlOf(singlePhoto)"
             :data-full="singlePhoto"
             alt="附的照片"
-           
+            loading="lazy"
             decoding="async"
             @error="onImageError"
           />
@@ -81,7 +81,7 @@
         <p v-if="event.content" class="content-text">{{ event.content }}</p>
         <!-- 随笔可选带一张随手拍 -->
         <div v-if="singlePhoto" class="note-photo">
-          <img :src="imgSrcFor(singlePhoto)" :data-full="singlePhoto" alt="随手拍" decoding="async" @error="onImgFail($event, singlePhoto)" />
+          <img :src="imgSrcFor(singlePhoto)" :data-full="singlePhoto" alt="随手拍" loading="lazy" decoding="async" @error="onImgFail($event, singlePhoto)" />
         </div>
       </template>
 
@@ -350,10 +350,7 @@ function onImgError(e: Event) {
 
 /* 带照片的卡片撑满可用高度，剩下的空间全给照片 */
 .feed-card.has-photo {
-  /* 不再固定成 --card-max：卡片高度和首页那个变量解耦，
-     避免任何"变量变→卡片变→再触发重算"的可能。 */
-  height: auto;
-  max-height: var(--card-max, 260px);
+  height: var(--card-max, 260px);
 }
 
 /* —— 喝奶茶：要让里面的照片也能跟着卡片伸缩 —— */
@@ -427,13 +424,11 @@ function onImgError(e: Event) {
    图片高度等容器，浏览器会一直重算，表现就是卡片闪烁、版面被不停往上拉。
    图片绝对定位之后就退出了这个循环，仍然按比例完整显示（object-fit: contain）。 */
 .note-photo {
-  /* 固定一条带：高度写死，不再参与弹性计算 */
   position: relative;
-  flex: 0 0 auto;
-  height: 150px;
+  flex: 1 1 auto;
+  min-height: 88px;
   margin-top: 10px;
   overflow: hidden;
-  contain: paint;
 }
 .note-photo img {
   position: absolute;
