@@ -217,6 +217,10 @@ onMounted(() => {
   display: flex;
   min-height: 0;
   padding: 14px 14px calc(50px + env(safe-area-inset-bottom));
+  /* 小屏 / 键盘弹起时整页能滚，别把日记本裁掉 */
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+  overscroll-behavior: contain;
 }
 
 .notebook {
@@ -224,7 +228,8 @@ onMounted(() => {
   flex: 1;
   display: flex;
   flex-direction: column;
-  min-height: 0;
+  /* 给正文留出底线高度：小屏上不再被压成 0，内容超出就滚动 */
+  min-height: 420px;
   padding: 16px 16px 14px 16px;
   background-color: var(--photo);
   border: var(--border);

@@ -34,7 +34,7 @@
 
 <script setup lang="ts">
 import { computed, onMounted, ref } from 'vue'
-import { useRoute } from 'vue-router'
+import { useRoute, useRouter } from 'vue-router'
 import {
   Ticket,
   Sparkles,
@@ -54,6 +54,7 @@ type Key = 'milktea' | 'kiss' | 'wish' | 'conflict'
 
 const active = ref<Key | null>(null)
 const route = useRoute()
+const router = useRouter()
 
 const {
   pendingRequests,
@@ -136,6 +137,13 @@ function open(k: Key) {
 }
 function close() {
   active.value = null
+  // 面板关掉后把 ?panel= 也清掉：否则刷新 / 后退会莫名又弹出来。
+  // 用 replace，不额外制造一条历史记录。
+  if (route.query.panel !== undefined) {
+    const query = { ...route.query }
+    delete query.panel
+    void router.replace({ path: route.path, query })
+  }
 }
 
 // 「我的 → 待办」跳过来时带着 ?panel=xxx，直接开那一页

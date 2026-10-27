@@ -63,7 +63,14 @@ import KissAskModal from '../components/KissAskModal.vue'
 const route = useRoute()
 const router = useRouter()
 
-const { needConflictPopup, openConflict, pauseOpen, loadPetition } = usePetition()
+const {
+  needConflictPopup,
+  openConflict,
+  pauseOpen,
+  loadPetition,
+  loadError: petitionError,
+  notice: petitionNotice
+} = usePetition()
 
 /* 一份矛盾里：两份都写完的那一刻（status 变成 active）就要弹，
    不能只在打开 App 时才检查。同一个会话里处理过就不再反复弹。 */
@@ -75,7 +82,7 @@ const inPause = computed(() => needConflictPopup.value)
 const pauseNote = computed(() => {
   const p = route.path
   if (p.startsWith('/record')) return '暂停期间先不记录。想说话，点上面那条断线。'
-  if (p.startsWith('/petition')) return '她递过来的都还在这儿，只是先不回。'
+  if (p.startsWith('/petition')) return '这些请求都还在这儿，只是先不回。'
   if (p.startsWith('/profile')) return '你还能看每一条，只是暂时不能开口。'
   return '这些都还在，只是你们暂时不说话。'
 })
@@ -93,7 +100,7 @@ watch(
   },
   { immediate: true }
 )
-const { loadEvents, lastLocalWriteAt } = useFeed()
+const { loadEvents, lastLocalWriteAt, loadError, profileError } = useFeed()
 let unsub: (() => void) | null = null
 
 /* 轻提示：有新动静时在底部飘一下，2.6 秒自己消失 */
@@ -106,6 +113,31 @@ function flash(text: string, ms = 2600) {
     notice.value = ''
   }, ms)
 }
+
+/* 错误不能再只躺在 console 里：加载失败 / 角色没确定 / 写了一半失败，
+   都要让界面看得见。同一条错误 30 秒内不重复弹，避免兜底轮询刷屏。 */
+let lastErrorText = ''
+let lastErrorAt = 0
+function reportError(text: string) {
+  const now = Date.now()
+  if (text === lastErrorText && now - lastErrorAt < 30000) return
+  lastErrorText = text
+  lastErrorAt = now
+  flash(text, 4200)
+}
+watch([loadError, petitionError, profileError], ([a, b, c]) => {
+  const msg = c || b || a
+  if (!msg) {
+    if (!a && !b && !c) lastErrorText = ''
+    return
+  }
+  reportError(msg)
+})
+watch(petitionNotice, (v) => {
+  if (!v) return
+  flash(v, 4200)
+  petitionNotice.value = null
+})
 
 
 const tabs = [
@@ -126,9 +158,11 @@ onMounted(async () => {
 
   // 实时：对方一发东西，这边立刻刷新（不用等他自己刷新）
   unsub = subscribeChanges({
-    // 真的有人动了数据：刷新 + 提示（但自己刚发完的那 6 秒内不提示）
+    // 真的有人动了数据：刷新 + 提示（但自己刚写的那 8 秒内既不刷新也不提示，
+    // 写操作已经在本机把结果插进流里了，避免自己触发一次整页重拉）
     onChange: () => {
-      if (Date.now() - lastLocalWriteAt() > 6000) flash('有新的动静，已经刷新')
+      if (Date.now() - lastLocalWriteAt() < 8000) return
+      flash('有新的动静，已经刷新')
       void loadEvents()
       void loadPetition()
     },

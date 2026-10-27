@@ -18,9 +18,10 @@ import type {
   RequestStatus,
   Wish
 } from '../types/domain'
-import type { FeedSource, LoadResult, PublishInput, Result, UploadResult } from './feedSource'
+import type { FeedSource, LoadResult, PublishInput, PublishResult, Result, UploadResult } from './feedSource'
 import { ADMIN_TABLES, buildAdminRecords } from './adminRecords'
 import { MOCK_EVENTS, MOCK_ME, MOCK_PARTNER } from './mockFeed'
+import { shrinkImage } from './image'
 
 // 复制一份，避免直接改动 mockFeed 里的预置数组
 const store: CoupleEvent[] = [...MOCK_EVENTS]
@@ -43,14 +44,31 @@ function meId(): string {
   return actingAs === 'partner' ? MOCK_PARTNER.id : MOCK_ME.id
 }
 
-/** 演示用：本机改过的档案（「我是谁」）也存一份 */
-function profilePatch(): Partial<Profile> {
+/**
+ * 演示用：本机改过的档案（「我是谁」）也存一份。
+ * **按身份分开存**，否则用 me 改一次昵称，切到 partner 也会读到同一个补丁
+ * （两个身份串号，甚至会因为两个 gender 相同而判错角色）。
+ * 兼容旧版扁平结构：只归给默认的 'me'。
+ */
+type ProfilePatch = Partial<Profile>
+function readProfileRoot(): Record<string, ProfilePatch> {
   try {
     const raw = localStorage.getItem('qingtao_mock_profile')
-    return raw ? (JSON.parse(raw) as Partial<Profile>) : {}
+    if (!raw) return {}
+    const parsed = JSON.parse(raw) as unknown
+    if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) return {}
+    const obj = parsed as Record<string, unknown>
+    if ('me' in obj || 'partner' in obj) {
+      return obj as Record<string, ProfilePatch>
+    }
+    // 旧版：整个对象就是 me 的补丁
+    return { me: parsed as ProfilePatch }
   } catch {
     return {}
   }
+}
+function profilePatch(): ProfilePatch {
+  return readProfileRoot()[actingAs] ?? {}
 }
 
 /** 本地演示里后台是否已登录（真实环境是 Supabase 会话） */
@@ -154,8 +172,9 @@ const conflicts: Conflict[] = []
 const conflictNotes: ConflictNote[] = []
 
 /* —— 刷新后仍在：把请愿数据存到 localStorage —— */
-function persist() {
-  if (typeof localStorage === 'undefined') return
+/** 返回是否真的写进去了（localStorage 满 / 隐私模式会失败） */
+function persist(): boolean {
+  if (typeof localStorage === 'undefined') return true
   try {
     localStorage.setItem(
       STORAGE_KEY,
@@ -169,9 +188,17 @@ function persist() {
         revokedEvents: store.filter((e) => e.revoked_at).map((e) => e.id)
       })
     )
-  } catch {
-    /* 存不下就算了，不影响使用 */
+    return true
+  } catch (e) {
+    // 不能默默吞掉：否则界面显示成功、刷新后却什么都没了
+    console.error('[青桃] 本地演示数据没写进 localStorage（可能超出容量）：', e)
+    return false
   }
+}
+
+/** 写失败时返回一句可读错误，写成功返回 { error: null } */
+function persistResult(): { error: unknown } {
+  return { error: persist() ? null : '本地演示数据没存下（localStorage 可能满了），刷新后会丢' }
 }
 
 function restore() {
@@ -206,32 +233,45 @@ function restore() {
 }
 restore()
 
+/** 把 File 读成 data: URL：本地演示没有服务端，只有这样才能刷新后还在 */
+function readAsDataURL(file: File): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader()
+    reader.onload = () => resolve(String(reader.result ?? ''))
+    reader.onerror = () => reject(reader.error ?? new Error('读取文件失败'))
+    reader.readAsDataURL(file)
+  })
+}
+
 /* 演示用：切换身份（见文件顶部说明） */
 export const mockSource: FeedSource = {
   async getMe(): Promise<Profile | null> {
+    // 返回副本：上层（resolveRoles / actorLabel）不能改到演示常量
     return { ...(actingAs === 'partner' ? MOCK_PARTNER : MOCK_ME), ...profilePatch() }
   },
 
   async getPartner(): Promise<Profile | null> {
-    return actingAs === 'partner' ? MOCK_ME : MOCK_PARTNER
+    // 必须返回副本：以前直接返回 MOCK_* 常量，上层就地写 gender 会永久污染演示数据
+    return { ...(actingAs === 'partner' ? MOCK_ME : MOCK_PARTNER) }
   },
 
   async updateProfile(patch): Promise<{ error: unknown }> {
     try {
-      const next = { ...profilePatch(), ...patch }
-      localStorage.setItem('qingtao_mock_profile', JSON.stringify(next))
-    } catch {
-      /* 忽略 */
+      const root = readProfileRoot()
+      root[actingAs] = { ...(root[actingAs] ?? {}), ...(patch as ProfilePatch) }
+      localStorage.setItem('qingtao_mock_profile', JSON.stringify(root))
+      return { error: null }
+    } catch (e) {
+      console.error('[青桃] 本地演示：保存档案失败', e)
+      return { error: e }
     }
-    return { error: null }
   },
 
   async setOwnRevoked(id: string, revoked: boolean) {
     const e = store.find((x) => x.id === id && x.actor_id === meId())
     if (!e) return { error: '没有这条记录' }
     e.revoked_at = revoked ? new Date().toISOString() : undefined
-    persist()
-    return { error: null }
+    return persistResult()
   },
 
   async listMyRevoked() {
@@ -249,8 +289,8 @@ export const mockSource: FeedSource = {
     return { data: sorted.slice(0, limit), error: null }
   },
 
-  async addEvent(input: PublishInput): Promise<{ error: unknown }> {
-    store.push({
+  async addEvent(input: PublishInput): Promise<PublishResult> {
+    const row: CoupleEvent = {
       id: nid('local'),
       actor_id: meId(),
       type: input.type,
@@ -258,14 +298,29 @@ export const mockSource: FeedSource = {
       photo_urls: input.photo_urls ?? null,
       meta: input.meta ?? null,
       created_at: new Date().toISOString()
-    })
-    persist()
-    return { error: null }
+    }
+    store.push(row)
+    const { error } = persistResult()
+    if (error) {
+      // 没存下就别让它留在内存里冒充「已写入」，否则刷新后消失更难查
+      store.pop()
+      return { error }
+    }
+    return { error: null, data: row }
   },
 
   async uploadPhoto(file: File): Promise<UploadResult> {
-    // 本地演示：不真的上传，直接用内存里的 object URL（刷新即失效）
-    return { url: URL.createObjectURL(file), error: null }
+    /* 本地演示：不能返回 blob: URL —— 它只在当前页面活着，
+       存进事件再刷新就变成裂图（以前就是这样把 blob 写进了「数据库」）。
+       这里压一道再转成 data: URL，刷新后仍然能显示。 */
+    try {
+      const small = await shrinkImage(file)
+      const url = await readAsDataURL(small)
+      return { url, error: null }
+    } catch (e) {
+      console.error('[青桃] 本地演示：读取照片失败', e)
+      return { url: null, error: e }
+    }
   },
 
   /* —— 奶茶券请求 —— */
@@ -283,19 +338,16 @@ export const mockSource: FeedSource = {
       created_at: new Date().toISOString(),
       resolved_at: null
     })
-    persist()
-    return { error: null }
+    return persistResult()
   },
 
   async resolveMilkteaRequest(id, status: Exclude<RequestStatus, 'pending'>) {
     const r = requests.find((x) => x.id === id)
-    if (r) {
-      r.status = status
-      r.resolver = meId()
-      r.resolved_at = new Date().toISOString()
-      persist()
-    }
-    return { error: null }
+    if (!r) return { error: '没有这条奶茶券请求（可能已被处理或删除）' }
+    r.status = status
+    r.resolver = meId()
+    r.resolved_at = new Date().toISOString()
+    return persistResult()
   },
 
   /* —— 亲亲 —— */
@@ -316,28 +368,23 @@ export const mockSource: FeedSource = {
       reason: input.reason ?? null,
       photo_url: input.photoUrl ?? null
     })
-    persist()
-    return { error: null }
+    return persistResult()
   },
 
   async resolveKiss(id, status: 'approved' | 'rejected') {
     const k = kisses.find((x) => x.id === id)
-    if (k) {
-      k.status = status
-      k.resolver = meId()
-      k.resolved_at = new Date().toISOString()
-      persist()
-    }
-    return { error: null }
+    if (!k) return { error: '没有这条亲亲记录' }
+    k.status = status
+    k.resolver = meId()
+    k.resolved_at = new Date().toISOString()
+    return persistResult()
   },
 
   async redeemKiss(id) {
     const k = kisses.find((x) => x.id === id)
-    if (k) {
-      k.redeemed = true
-      persist()
-    }
-    return { error: null }
+    if (!k) return { error: '没有这条亲亲记录' }
+    k.redeemed = true
+    return persistResult()
   },
 
   /* —— 心愿 —— */
@@ -355,18 +402,15 @@ export const mockSource: FeedSource = {
       created_at: new Date().toISOString(),
       done_at: null
     })
-    persist()
-    return { error: null }
+    return persistResult()
   },
 
   async setWishDone(id, done: boolean) {
     const w = wishes.find((x) => x.id === id)
-    if (w) {
-      w.done = done
-      w.done_at = done ? new Date().toISOString() : null
-      persist()
-    }
-    return { error: null }
+    if (!w) return { error: '没有这个心愿' }
+    w.done = done
+    w.done_at = done ? new Date().toISOString() : null
+    return persistResult()
   },
 
   /* —— 矛盾记录 —— */
@@ -383,8 +427,7 @@ export const mockSource: FeedSource = {
       created_at: new Date().toISOString(),
       updated_at: new Date().toISOString()
     })
-    persist()
-    return { error: null }
+    return persistResult()
   },
 
   async listConflictNotes(): Promise<Result<ConflictNote[]>> {
@@ -392,6 +435,8 @@ export const mockSource: FeedSource = {
   },
 
   async addConflictNote(input) {
+    const cf = conflicts.find((c) => c.id === input.conflict_id)
+    if (!cf) return { error: '没有这份矛盾记录' }
     conflictNotes.push({
       id: nid('cn'),
       conflict_id: input.conflict_id,
@@ -404,20 +449,16 @@ export const mockSource: FeedSource = {
     // 双方都填了 → 自动进入 active
     const note = conflictNotes.filter((n) => n.conflict_id === input.conflict_id)
     const authors = new Set(note.map((n) => n.author))
-    const cf = conflicts.find((c) => c.id === input.conflict_id)
-    if (cf && cf.status === 'collecting' && authors.size >= 2) cf.status = 'active'
-    persist()
-    return { error: null }
+    if (cf.status === 'collecting' && authors.size >= 2) cf.status = 'active'
+    return persistResult()
   },
 
   async setConflictStatus(id, status: ConflictStatus) {
     const cf = conflicts.find((c) => c.id === id)
-    if (cf) {
-      cf.status = status
-      cf.updated_at = new Date().toISOString()
-      persist()
-    }
-    return { error: null }
+    if (!cf) return { error: '没有这份矛盾记录' }
+    cf.status = status
+    cf.updated_at = new Date().toISOString()
+    return persistResult()
   },
 
   /* ============================================================
@@ -454,12 +495,8 @@ export const mockSource: FeedSource = {
   async adminSetRevoked(table: string, id: string, revoked: boolean) {
     if (!(ADMIN_TABLES as readonly string[]).includes(table)) return { error: '不允许的表' }
     const at = revoked ? new Date().toISOString() : null
-    const row = store.find((x) => x.id === id && table === 'events') as
-      | { revoked_at?: string | null }
-      | undefined
-    if (row) row.revoked_at = at
-
     const lists: Record<string, { id: string; revoked_at?: string | null }[]> = {
+      events: store,
       milktea_requests: requests,
       kisses,
       wishes,
@@ -467,10 +504,10 @@ export const mockSource: FeedSource = {
       conflict_notes: conflictNotes
     }
     const hit = lists[table]?.find((x) => x.id === id)
-    if (hit) hit.revoked_at = at
+    if (!hit) return { error: '没有这条记录' }
+    hit.revoked_at = at
 
-    persist()
-    return { error: null }
+    return persistResult()
   },
 
   async adminListProfiles(): Promise<Result<Profile[]>> {
@@ -489,12 +526,11 @@ export const mockSource: FeedSource = {
       conflict_notes: conflictNotes
     }
     const arr = lists[table]
-    if (arr) {
-      const i = arr.findIndex((x) => x.id === id)
-      if (i >= 0) arr.splice(i, 1)
-    }
-    persist()
-    return { error: null }
+    if (!arr) return { error: '不允许的表' }
+    const i = arr.findIndex((x) => x.id === id)
+    if (i < 0) return { error: '没有这条记录' }
+    arr.splice(i, 1)
+    return persistResult()
   },
 
   async adminPurgeRevoked() {
@@ -514,8 +550,8 @@ export const mockSource: FeedSource = {
     purge(wishes)
     purge(conflicts)
     purge(conflictNotes)
-    persist()
-    return { count, error: null }
+    const { error } = persistResult()
+    return { count, error }
   },
 
   async adminPurgeBefore(before: string) {
@@ -536,8 +572,8 @@ export const mockSource: FeedSource = {
     purge(wishes)
     purge(conflicts)
     purge(conflictNotes)
-    persist()
-    return { count, error: null }
+    const { error } = persistResult()
+    return { count, error }
   }
 }
 

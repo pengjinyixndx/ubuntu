@@ -169,7 +169,9 @@ async function removeIt() {
 }
 
 const singlePhoto = computed(() =>
-  props.event.type === 'note' || props.event.type === 'milktea_redeem'
+  props.event.type === 'note' ||
+  props.event.type === 'milktea_redeem' ||
+  props.event.type === 'kiss'
     ? (props.event.photo_urls?.[0] ?? '')
     : ''
 )
@@ -304,6 +306,9 @@ function onImgError(e: Event) {
 
 .detail-body {
   overflow-y: auto;
+  /* 预留滚动条位置：否则图片高度一变→滚动条出现/消失→可用宽度变→
+     图片高度再变，桌面端会形成宽度来回抖的循环。 */
+  scrollbar-gutter: stable;
   padding: 16px 16px 20px;
 }
 
@@ -339,6 +344,9 @@ function onImgError(e: Event) {
 }
 .detail-photos img {
   width: 100%;
+  height: auto;
+  max-height: 58vh;
+  object-fit: contain;
   border: var(--border);
   border-radius: var(--r-sm);
   background-color: var(--paper-deep);
@@ -351,8 +359,13 @@ function onImgError(e: Event) {
   overflow: hidden;
   background-color: var(--paper-deep);
 }
+/* 高度由图片自身比例决定，但上限是固定值（不依赖容器高度反推）；
+   contain 保证任何比例都完整显示，不裁切、不变形。 */
 .note-photo img {
   width: 100%;
+  height: auto;
+  max-height: 58vh;
+  object-fit: contain;
 }
 
 .photo-cap {

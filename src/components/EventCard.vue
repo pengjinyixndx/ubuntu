@@ -12,7 +12,7 @@
       <!-- 照片：整组 -->
       <div v-if="event.type === 'photo'" class="photo-grid">
         <div v-for="(url, i) in visiblePhotos" :key="i" class="photo-cell">
-          <img :src="imgSrcFor(url)" :data-full="url" alt="照片" loading="lazy" decoding="async" @error="onImgFail($event, url)" @load="onImgLoad($event, url)" />
+          <img :src="imgSrcFor(url)" :data-full="url" alt="照片" loading="lazy" decoding="async" @error="onImgFail($event, url)" />
           <span v-if="i === 2 && restCount > 0" class="photo-more">+{{ restCount }}</span>
         </div>
       </div>
@@ -33,8 +33,8 @@
           <span v-for="c in teaChips" :key="c" class="chip">{{ c }}</span>
         </div>
         <p v-if="event.content" class="content-text">{{ event.content }}</p>
-        <div v-if="singlePhoto" class="note-photo" :style="photoStyle(singlePhoto)">
-          <img :src="imgSrcFor(singlePhoto)" :data-full="singlePhoto" alt="这一杯" loading="lazy" decoding="async" @error="onImgFail($event, singlePhoto)" @load="onImgLoad($event, singlePhoto)" />
+        <div v-if="singlePhoto" class="note-photo">
+          <img :src="imgSrcFor(singlePhoto)" :data-full="singlePhoto" alt="这一杯" loading="lazy" decoding="async" @error="onImgFail($event, singlePhoto)" />
         </div>
       </div>
 
@@ -61,14 +61,14 @@
 
         <p v-if="kissReason" class="kiss-reason">{{ kissReason }}</p>
 
-        <div v-if="singlePhoto" class="note-photo" :style="photoStyle(singlePhoto)">
+        <div v-if="singlePhoto" class="note-photo">
           <img
-            :src="thumbUrlOf(singlePhoto)"
+            :src="imgSrcFor(singlePhoto)"
             :data-full="singlePhoto"
             alt="附的照片"
             loading="lazy"
             decoding="async"
-            @error="onImageError"
+            @error="onImgFail($event, singlePhoto)"
           />
         </div>
       </div>
@@ -80,8 +80,8 @@
         </div>
         <p v-if="event.content" class="content-text">{{ event.content }}</p>
         <!-- 随笔可选带一张随手拍 -->
-        <div v-if="singlePhoto" class="note-photo" :style="photoStyle(singlePhoto)">
-          <img :src="imgSrcFor(singlePhoto)" :data-full="singlePhoto" alt="随手拍" loading="lazy" decoding="async" @error="onImgFail($event, singlePhoto)" @load="onImgLoad($event, singlePhoto)" />
+        <div v-if="singlePhoto" class="note-photo">
+          <img :src="imgSrcFor(singlePhoto)" :data-full="singlePhoto" alt="随手拍" loading="lazy" decoding="async" @error="onImgFail($event, singlePhoto)" />
         </div>
       </template>
 
@@ -91,8 +91,10 @@
       <p v-if="event.type === 'photo' && event.content" class="cap">{{ event.content }}</p>
     </div>
 
-    <!-- 当前卡片且内容过长时，提示可点开看全文 -->
-    <div v-if="current && isText && tooLong" class="more-hint">
+    <!-- 内容过长时提示可点开看全文。
+         注意：即使不是当前卡也渲染（只是不可见），这样"进入居中"时
+         不会因为多出这一行而把照片挤小一次。 -->
+    <div v-if="isText && tooLong" class="more-hint" :class="{ 'more-hint--off': !current }">
       查看全文
       <Maximize2 :size="12" :stroke-width="1.8" />
     </div>
@@ -100,7 +102,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, onMounted, onUnmounted, ref } from 'vue'
+import { computed, ref } from 'vue'
 import {
   PenLine,
   BookOpen,
@@ -117,13 +119,15 @@ import { WEATHERS, MOODS, labelOfKey } from '../lib/options'
 import Critter from './Critter.vue'
 import { usePetition } from '../composables/usePetition'
 import { useFeed } from '../composables/useFeed'
-import { thumbUrlOf, onImageError, IMAGE_PLACEHOLDER } from '../lib/image'
+import { thumbUrlOf, IMAGE_PLACEHOLDER } from '../lib/image'
 
 const props = defineProps<{
   event: CoupleEvent
   me: Profile
   /** 是否为当前居中的卡片 */
   current: boolean
+  /** 首页统一维护的“现在”，每 20 秒变一次；卡片用它触发相对时间重算 */
+  now: number
 }>()
 
 defineEmits<{ pick: [] }>()
@@ -158,18 +162,6 @@ const isKiss = computed(() => props.event.type === 'kiss')
    以前是改 img.src 兜底，但组件每次重新渲染会把 src 绑回坏地址，
    于是失败—占位—重绑—再失败，一直闪。改成由状态决定显示什么。 */
 const failedUrls = ref<string[]>([])
-/* 每张照片自己的宽高比。比例来自图片本身（固有数字），
-   不依赖布局 —— 所以既能按真实比例显示、又不会引起重算。 */
-const ratios = ref<Record<string, number>>({})
-function onImgLoad(e: Event, url: string): void {
-  const img = e.currentTarget as HTMLImageElement
-  if (!img.naturalWidth || !img.naturalHeight || ratios.value[url]) return
-  ratios.value = { ...ratios.value, [url]: img.naturalWidth / img.naturalHeight }
-}
-function photoStyle(url: string): Record<string, string> {
-  const r = ratios.value[url]
-  return r ? { aspectRatio: String(r) } : {}
-}
 function imgSrcFor(url: string): string {
   if (!url) return IMAGE_PLACEHOLDER
   return failedUrls.value.includes(url) ? IMAGE_PLACEHOLDER : thumbUrlOf(url)
@@ -255,29 +247,13 @@ const issueExpiry = computed(() => {
 // 超过约 80 字就折叠，提示点开看全文
 const tooLong = computed(() => (props.event.content?.length ?? 0) > 80)
 
-// 相对时间每 20 秒重算
-const now = ref(Date.now())
-let timer = 0
-onMounted(() => {
-  timer = window.setInterval(() => {
-    now.value = Date.now()
-  }, 20000)
-})
-onUnmounted(() => window.clearInterval(timer))
+// 相对时间：由首页统一的 now（每 20 秒 tick）触发重算。
+// 卡片自己不再开 setInterval —— 以前 60 张卡就有 60 个定时器。
 const time = computed(() => {
-  now.value
+  // 读取 props.now 只为了建立响应式依赖；格式化仍交给公共 timeLabel
+  void props.now
   return timeLabel(props.event.created_at)
 })
-
-const PLACEHOLDER =
-  'data:image/svg+xml;utf8,' +
-  encodeURIComponent(
-    `<svg xmlns="http://www.w3.org/2000/svg" width="400" height="300"><rect width="100%" height="100%" fill="#f3ead4"/><g fill="none" stroke="#98663a" stroke-width="2"><rect x="165" y="112" width="70" height="52"/><circle cx="180" cy="128" r="5"/><path d="M165 164 L190 134 L215 164"/></g><text x="200" y="205" font-family="serif" font-size="15" fill="#b3a588" text-anchor="middle">暂无图片</text></svg>`
-  )
-function onImgError(e: Event) {
-  const img = e.currentTarget as HTMLImageElement
-  if (img.src !== PLACEHOLDER) img.src = PLACEHOLDER
-}
 </script>
 
 <style scoped>
@@ -366,9 +342,18 @@ function onImgError(e: Event) {
   height: var(--card-max, 260px);
 }
 
+/* 带照片时把正文区的上下留白收紧一点，多出来的几像素全给照片 */
+.feed-card.has-photo .card-content {
+  padding: 10px 13px;
+}
+.feed-card.has-photo .note-photo {
+  margin-top: 6px;
+}
+
 /* —— 喝奶茶：要让里面的照片也能跟着卡片伸缩 —— */
 .tea {
-  flex: 0 0 auto;
+  flex: 1 1 auto;
+  min-height: 0;
   display: flex;
   flex-direction: column;
 }
@@ -428,22 +413,20 @@ function onImgError(e: Event) {
 }
 
 /* —— 随笔的一张随手拍 ——
-   不给它裁切：图片按原比例缩到能放下的最大尺寸，整张贴上去（不裁、不变形）。
-   容器是居中弹性盒，图自己按 max-width/max-height 双向收敛。 */
-/* 照片区：高度**算死**（由卡片高度减掉抬头+正文+内边距得出），
-   不由内容撑。这样无论照片是什么比例，都不会出现
-   「框的高度等图片、图片的高度等框」的互相推导 —— 那正是闪烁的来源。 */
+   照片区高度不再由图片反推，也不再有 min-height 和 max-height 互相打架：
+   卡片高度是算死的（has-photo），正文定高，剩下的高度全给照片。
+   图片绝对定位 + object-fit: contain —— 任意比例都完整显示、不裁切、不变形，
+   而且图片加载前后几何完全一样，不会因为 load 事件再重排一次。 */
 .note-photo {
-  /* 高度由照片自己的宽高比决定（加载后才知道，写在行内 style 上）；
-     加载前用 4:3 占位，避免跳动。
-     上限仍由卡片高度兜住，所以再高的图也不会撑破卡片。 */
   position: relative;
-  flex: 0 0 auto;
-  aspect-ratio: 4 / 3;
-  max-height: calc(var(--card-max, 260px) - 100px);
-  min-height: 90px;
+  flex: 1 1 auto;
+  min-height: 0;
+  align-self: stretch;
   margin-top: 8px;
   overflow: hidden;
+  background-color: var(--paper-deep);
+  border: var(--border);
+  border-radius: var(--r-sm);
 }
 .note-photo img {
   position: absolute;
@@ -452,9 +435,6 @@ function onImgError(e: Event) {
   width: 100%;
   height: 100%;
   object-fit: contain;
-  border: var(--border);
-  border-radius: var(--r-sm);
-  background-color: var(--paper-deep);
 }
 
 .pause-mark {
@@ -467,6 +447,8 @@ function onImgError(e: Event) {
 }
 /* —— 亲亲：两个人之间一颗心 —— */
 .kiss {
+  flex: 1 1 auto;
+  min-height: 0;
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -522,6 +504,8 @@ function onImgError(e: Event) {
   margin: 0;
   padding: 8px 11px;
   max-width: 100%;
+  max-height: 4.1em; /* 给照片留出固定高度，长理由不把照片挤没 */
+  overflow: hidden;
   background-color: var(--paper);
   border: var(--border-dashed);
   border-radius: var(--r-sm);
@@ -572,5 +556,10 @@ function onImgError(e: Event) {
   font-size: var(--fs-xs);
   letter-spacing: 2px;
   color: var(--caramel);
+}
+
+/* 不在中间时只占位、不显示：保证卡片内部几何与是否居中无关 */
+.more-hint--off {
+  visibility: hidden;
 }
 </style>

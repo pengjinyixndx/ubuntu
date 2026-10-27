@@ -3,8 +3,8 @@
     <!-- 今日免费 + 欠账 -->
     <section class="summary">
       <div class="cell">
-        <span class="cell-num">{{ freeLeftToday }}</span>
-        <span class="cell-label">今天还能免费要</span>
+        <span class="cell-num">{{ freeLeftShow }}</span>
+        <span class="cell-label">{{ freeLabel }}</span>
       </div>
       <div class="cell">
         <span class="cell-num">{{ kissDebt }}</span>
@@ -75,7 +75,7 @@
 import { computed, onMounted, ref } from 'vue'
 import { Camera, X } from 'lucide-vue-next'
 import type { Kiss } from '../types/domain'
-import { usePetition } from '../composables/usePetition'
+import { usePetition, KISS_FREE_PER_DAY } from '../composables/usePetition'
 import { useFeed } from '../composables/useFeed'
 import { useMilktea } from '../composables/useMilktea'
 import { actorLabel, timeLabel } from '../lib/eventLabels'
@@ -111,6 +111,34 @@ function who(id: string): string {
 function time(iso: string): string {
   return timeLabel(iso)
 }
+/** 是否同一天（本地时区），和 usePetition 里的判定保持一致 */
+function isToday(iso: string): boolean {
+  const d = new Date(iso)
+  const n = new Date()
+  return (
+    d.getFullYear() === n.getFullYear() &&
+    d.getMonth() === n.getMonth() &&
+    d.getDate() === n.getDate()
+  )
+}
+
+/**
+ * 免费额度是她的事：freeLeftToday 只统计「当前账号发起的」，
+ * 他打开时永远是满额，不能直接拿来显示。
+ * 他这边按她的免费记录算一份，才能和她在请愿页看到的数字一致。
+ */
+const herFreeUsedToday = computed(() => {
+  const myId = myProfile.value?.id ?? ''
+  return kisses.value
+    .filter((k) => k.requester !== myId && k.status === 'free' && isToday(k.created_at))
+    .reduce((sum, k) => sum + k.count, 0)
+})
+const freeLeftShow = computed(() =>
+  iAmHer.value
+    ? freeLeftToday.value
+    : Math.max(0, KISS_FREE_PER_DAY - herFreeUsedToday.value)
+)
+const freeLabel = computed(() => (iAmHer.value ? '今天还能免费要' : '她今天还能要'))
 
 const owed = computed(() =>
   kisses.value.filter((k) => !k.redeemed && (k.status === 'free' || k.status === 'approved'))

@@ -67,13 +67,27 @@
         <path d="M 262 42 Q 257 35 262 29 Q 267 35 262 42 Z" fill="#c3a06a" opacity="0.8" />
       </svg>
 
-      <!-- 每张卡片从枝上垂下 -->
-      <div v-for="(ev, i) in events" :key="ev.id" class="hanger" :style="hangerPose(i)">
+      <!-- 每张卡片从枝上垂下。
+           只挂当前卡 + 左右各一张：60 张全挂会让低端安卓常驻 60 个合成层、
+           60 个定时器，滑动时掉帧，看着就像闪烁。 -->
+      <div
+        v-for="item in visibleCards"
+        :key="item.ev.id"
+        class="hanger"
+        :class="{ 'is-current': item.i === activeIndex }"
+        :style="hangerPose(item.i)"
+      >
         <svg class="stem" viewBox="0 0 30 110" width="30" height="110" aria-hidden="true">
-          <path :d="stemPath(i)" stroke="#98663a" stroke-width="2" fill="none" stroke-linecap="round" />
+          <path :d="stemPath(item.i)" stroke="#98663a" stroke-width="2" fill="none" stroke-linecap="round" />
           <circle cx="15" cy="3" r="2.6" fill="#98663a" />
         </svg>
-        <EventCard :event="ev" :me="myProfile" :current="i === activeIndex" @pick="onPick(i)" />
+        <EventCard
+          :event="item.ev"
+          :me="myProfile"
+          :now="now"
+          :current="item.i === activeIndex"
+          @pick="onPick(item.i)"
+        />
       </div>
 
       <!-- 位置指示 -->
@@ -100,7 +114,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, nextTick, onMounted, onUnmounted, ref, type CSSProperties } from 'vue'
+import { computed, nextTick, onMounted, onUnmounted, ref, watch, type CSSProperties } from 'vue'
 import { PenLine } from 'lucide-vue-next'
 import TopDecor from '../components/TopDecor.vue'
 import EventCard from '../components/EventCard.vue'
@@ -117,19 +131,77 @@ const { events, myProfile, loading, loadEvents } = useFeed()
 
 const feedRef = ref<HTMLElement | null>(null)
 const W = ref(390)
-// 卡片可用高度：由 .feed 的实际高度算出来，交给卡片当 max-height
+// 卡片可用高度：由 .feed 的实际高度算出来，带照片的卡片按这个值定高
 const cardMax = ref(260)
-// 当前居中卡片的下标（events 最新在前，0 = 最新）
-const activeIndex = ref(0)
+// 当前居中卡片用**事件 id** 记住，而不是下标：
+// 实时刷新会整体替换 events，下标会错位/越界；按 id 找才不会在手指下换卡。
+const activeEventId = ref('')
+const activeIndex = computed(() => {
+  for (let i = 0; i < events.value.length; i++) {
+    if (events.value[i]?.id === activeEventId.value) return i
+  }
+  return 0
+})
+
+// 只挂载当前卡和左右各一张；其余不生成 DOM（节省合成层与渲染开销）
+const visibleCards = computed(() => {
+  const list: { ev: CoupleEvent; i: number }[] = []
+  const n = events.value.length
+  if (!n) return list
+  const c = activeIndex.value
+  for (let i = Math.max(0, c - 1); i <= Math.min(n - 1, c + 1); i++) {
+    const ev = events.value[i]
+    if (ev) list.push({ ev, i })
+  }
+  return list
+})
+
+// 相对时间统一由首页每 20 秒 tick 一次，卡片不再各自开定时器
+const now = ref(Date.now())
+let nowTimer = 0
+
+// 实时刷新整体替换 events 之后：正在看的那条还在就保持不动；
+// 被对方删掉了才回到最新一条，不会整屏空白。
+watch(events, (list) => {
+  if (!list.length) {
+    activeEventId.value = ''
+    return
+  }
+  if (!list.some((e) => e.id === activeEventId.value)) {
+    activeEventId.value = list[0]?.id ?? ''
+  }
+})
+
 const dragDx = ref(0)
 const isDragging = ref(false)
 const detailEvent = ref<CoupleEvent | null>(null)
 
-function measure() {
-  if (!feedRef.value) return
-  W.value = feedRef.value.clientWidth
+/* 量可用高度。
+   手机地址栏伸缩（安卓 Chrome 最明显）会连续触发几十次 resize。
+   如果每次都改写 --card-max，带照片的卡片（高度固定为 --card-max）就会
+   一帧一个高度，看上去就是"那条卡片一直闪、版面一直往上拉"。
+   所以：变化先做 160ms 去抖，并且高度变化不到 4px 不写。
+   另外用 ResizeObserver 盯住 .feed 本身：字体晚加载会让它高度变一次，
+   那时没有 window resize，只在 resize 里量会一直用错的高度。 */
+let measureTimer = 0
+let measuredOnce = false
+let ro: ResizeObserver | null = null
+function applyMeasure() {
+  const el = feedRef.value
+  if (!el) return
+  W.value = el.clientWidth
   // 树枝下沿 44 + 垂茎 110 + 底部留白 10
-  cardMax.value = Math.max(150, feedRef.value.clientHeight - 44 - 110 - 10)
+  const next = Math.max(150, el.clientHeight - 44 - 110 - 10)
+  // 量化到 2px，避免亚像素抖动反复触发重排
+  const q = Math.round(next / 2) * 2
+  if (!measuredOnce || Math.abs(q - cardMax.value) >= 4) {
+    cardMax.value = q
+    measuredOnce = true
+  }
+}
+function onResize() {
+  window.clearTimeout(measureTimer)
+  measureTimer = window.setTimeout(applyMeasure, 160)
 }
 
 const feedStyle = computed(() => {
@@ -166,7 +238,9 @@ function stemPath(i: number): string {
 }
 
 function goTo(i: number) {
-  activeIndex.value = clamp(i, 0, events.value.length - 1)
+  const idx = clamp(i, 0, events.value.length - 1)
+  const ev = events.value[idx]
+  if (ev) activeEventId.value = ev.id
 }
 function prev() {
   goTo(activeIndex.value - 1)
@@ -237,15 +311,30 @@ function onWheel(e: WheelEvent) {
 }
 
 onMounted(async () => {
-  measure()
-  window.addEventListener('resize', measure)
+  nowTimer = window.setInterval(() => {
+    now.value = Date.now()
+  }, 20000)
+  window.addEventListener('resize', onResize)
+  applyMeasure()
   await loadEvents()
   await nextTick()
-  measure() // 卡片渲染出来之后再量一次，此时 .feed 才有真实高度
-  activeIndex.value = 0
+  applyMeasure() // 卡片渲染出来之后再量一次，此时 .feed 才有真实高度
+  if (feedRef.value && typeof ResizeObserver !== 'undefined') {
+    ro = new ResizeObserver(onResize)
+    ro.observe(feedRef.value)
+  }
+  // 字体晚加载会改变上面几块的高度，字体就绪后再量一次
+  void document.fonts?.ready.then(onResize)
+  if (!activeEventId.value) activeEventId.value = events.value[0]?.id ?? ''
 })
 
-onUnmounted(() => window.removeEventListener('resize', measure))
+onUnmounted(() => {
+  window.removeEventListener('resize', onResize)
+  window.clearTimeout(measureTimer)
+  window.clearInterval(nowTimer)
+  ro?.disconnect()
+  ro = null
+})
 </script>
 
 <style scoped>
@@ -402,6 +491,24 @@ onUnmounted(() => window.removeEventListener('resize', measure))
   transition:
     transform 0.42s cubic-bezier(0.22, 0.8, 0.24, 1),
     opacity 0.3s ease;
+  /* 只挂 3 张后，新滑进来的侧卡是"新插入"的 DOM，没有旧值可过渡。
+     用隐式关键帧让它从透明淡到自己的目标透明度，避免在可视区瞬间出现。 */
+  animation: hanger-in 0.28s ease-out;
+}
+
+@keyframes hanger-in {
+  from {
+    opacity: 0;
+  }
+}
+
+/* 只给当前卡提升合成层：以前每张卡都常驻 will-change，
+   低端安卓上合成层太多，滑动时反而更容易掉帧。
+   拖动时三张都在动，才临时把三张都提升（现在最多只有三张）。 */
+.hanger.is-current {
+  will-change: transform, opacity;
+}
+.feed.dragging .hanger {
   will-change: transform, opacity;
 }
 

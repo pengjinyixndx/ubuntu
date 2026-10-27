@@ -246,7 +246,13 @@ async function load() {
   const [all, ps] = await Promise.all([src.adminListAll(), src.adminListProfiles()])
   rows.value = all.data
   profiles.value = ps.data
-  if (all.error) msg.value = '读取记录出错，具体看浏览器控制台'
+  // 两个请求的错误都要上屏：只报一个会把另一半遮掉
+  const failed: string[] = []
+  if (all.error) failed.push('记录')
+  if (ps.error) failed.push('成员档案')
+  if (failed.length) {
+    msg.value = `读取${failed.join('、')}出错，具体看浏览器控制台`
+  }
   loading.value = false
 }
 

@@ -15,9 +15,9 @@ import type {
   RequestStatus,
   Wish
 } from '../types/domain'
-import type { FeedSource, LoadResult, PublishInput, Result, UploadResult } from './feedSource'
+import type { FeedSource, LoadResult, PublishInput, PublishResult, Result, UploadResult } from './feedSource'
 import { ADMIN_TABLES, buildAdminRecords } from './adminRecords'
-import { makeThumb } from './image'
+import { imageExt, makeThumb, thumbPathOf } from './image'
 
 /** 图片存储桶名（需在 Supabase 建好，见 supabase/storage.sql） */
 const BUCKET = 'photos'
@@ -34,15 +34,84 @@ function fail(scope: string, error: unknown) {
   console.error(`[青桃] ${scope}：`, error)
 }
 
+/**
+ * 改一行并确认**真的改到了**。
+ * PostgREST 在 RLS 没放行时不会报错、却一行也不改；不把 id 取回来数，
+ * 前端就会显示「成功」而数据库什么都没变（她点「好呀」没反应）。
+ */
+async function updateOrFail(
+  table: string,
+  patch: Record<string, unknown>,
+  id: string,
+  scope: string
+): Promise<{ error: unknown }> {
+  const { data, error } = await supabase.from(table).update(patch).eq('id', id).select('id')
+  if (error) {
+    fail(scope, error)
+    return { error }
+  }
+  if (!data || data.length === 0) {
+    const message = `${scope}：数据库一行都没改到（检查这一张表的更新策略）`
+    fail(scope, message)
+    return { error: message }
+  }
+  return { error: null }
+}
+
+/**
+ * 从「除我以外的档案」里挑出对象。
+ * - 优先排除后台账号（is_admin === true）；这一列可能不存在，所以只做过滤条件、不写进查询；
+ * - 剩下的如果不止一个（is_admin 列还没跑），取**注册时间离我最近**的那个：
+ *   两个人前后脚注册，后台账号通常隔得更远，比「列表里第一个」稳得多；
+ * - 绝不因为挑不出来就退回我自己。
+ */
+export function pickPartner(profiles: Profile[], uid: string): Profile | null {
+  let me: Profile | null = null
+  const others: Profile[] = []
+  for (const p of profiles) {
+    if (p.id === uid) me = p
+    else others.push(p)
+  }
+  if (!others.length) return null
+
+  const normal = others.filter((p) => p.is_admin !== true)
+  const pool = normal.length ? normal : others
+
+  if (pool.length === 1) return pool[0] ?? null
+
+  if (pool.length > 1) {
+    console.warn(`[青桃] 除你之外有 ${pool.length} 个档案，按注册时间取最近的一个当对象`)
+  }
+  const meAt = me?.created_at ? Date.parse(me.created_at) : NaN
+  const distance = (p: Profile): number => {
+    const t = p.created_at ? Date.parse(p.created_at) : NaN
+    return Number.isFinite(meAt) && Number.isFinite(t) ? Math.abs(t - meAt) : Number.POSITIVE_INFINITY
+  }
+  return (
+    pool
+      .slice()
+      .sort((a, b) => {
+        const da = distance(a)
+        const db = distance(b)
+        if (da !== db) return da - db
+        return a.id < b.id ? -1 : a.id > b.id ? 1 : 0
+      })[0] ?? null
+  )
+}
+
 export const supabaseSource: FeedSource = {
   async getMe(): Promise<Profile | null> {
     const uid = await myId()
     if (!uid) return null
 
-    const { data, error } = await supabase.from('profiles').select('*').eq('id', uid).single()
+    const { data, error } = await supabase.from('profiles').select('*').eq('id', uid).maybeSingle()
 
     if (error) {
       fail('读取档案失败', error)
+      return null
+    }
+    if (!data) {
+      console.warn('[青桃] profiles 里没有你的档案行（注册触发器可能没跑）')
       return null
     }
     return data as Profile
@@ -55,8 +124,8 @@ export const supabaseSource: FeedSource = {
     /* 注意：**不要**把 is_admin 写进查询条件。
        万一 admin.sql 还没跑，这一列根本不存在，整个查询会直接报错，
        对方档案就永远拿不到——表现就是「两个账号都指向同一个人」。
-       所以先把除自己以外的全部取回来，再在本地挑掉后台账号。 */
-    const { data, error } = await supabase.from('profiles').select('*').neq('id', uid)
+       所以先把档案全部取回来，再在本地挑掉后台账号。 */
+    const { data, error } = await supabase.from('profiles').select('*')
 
     if (error) {
       fail('读取对方档案失败', error)
@@ -64,16 +133,18 @@ export const supabaseSource: FeedSource = {
     }
 
     const list = (data ?? []) as Profile[]
-    const partner = list.find((p) => p.is_admin !== true) ?? list[0] ?? null
+    const partner = pickPartner(list, uid)
+    if (!partner) {
+      console.warn('[青桃] 除自己以外没有别的档案，拿不到对象')
+      return null
+    }
     return partner
   },
 
   async updateProfile(patch): Promise<{ error: unknown }> {
     const uid = await myId()
     if (!uid) return { error: '未登录' }
-    const { error } = await supabase.from('profiles').update(patch).eq('id', uid)
-    if (error) fail('保存档案失败', error)
-    return { error }
+    return updateOrFail('profiles', patch, uid, '保存档案失败')
   },
 
   async setOwnRevoked(id: string, revoked: boolean): Promise<{ error: unknown }> {
@@ -130,59 +201,81 @@ export const supabaseSource: FeedSource = {
     return { data: (data ?? []) as CoupleEvent[], error }
   },
 
-  async addEvent(input: PublishInput): Promise<{ error: unknown }> {
+  async addEvent(input: PublishInput): Promise<PublishResult> {
     const uid = await myId()
     if (!uid) return { error: '未登录' }
 
-    const { error } = await supabase.from('events').insert({
-      actor_id: uid,
-      type: input.type,
-      content: input.content ?? null,
-      photo_urls: input.photo_urls ?? null,
-      meta: input.meta ?? null
-    })
+    // select 把插入后的整行带回来：调用方可以直接插进流里，不用再全量拉一遍
+    const { data, error } = await supabase
+      .from('events')
+      .insert({
+        actor_id: uid,
+        type: input.type,
+        content: input.content ?? null,
+        photo_urls: input.photo_urls ?? null,
+        meta: input.meta ?? null
+      })
+      .select('*')
+      .single()
 
-    if (error) fail('写入动态失败', error)
-    return { error }
+    if (error) {
+      fail('写入动态失败', error)
+      return { error }
+    }
+    return { error: null, data: data as CoupleEvent }
   },
 
   async uploadPhoto(file: File): Promise<UploadResult> {
     const uid = await myId()
     if (!uid) return { url: null, error: '未登录' }
 
-    const ext = file.name.split('.').pop()?.toLowerCase() || 'jpg'
+    /* 扩展名不能只从文件名来：相机 / 剪贴板的 File 可能没有名字或没有点。
+       没有扩展名时 Supabase 会按 octet-stream 返回，<img> 直接加载失败。 */
+    const ext = imageExt(file)
     const path = `${uid}/${Date.now()}-${Math.random().toString(36).slice(2, 8)}.${ext}`
+    const thumbPath = thumbPathOf(path)
+    const isThumbable = /\.(jpe?g|png|webp)$/i.test(path)
 
     /* 缓存给一年：文件名带时间戳、永不重复，所以不会看到旧图。
        原来是 1 小时，等于每次打开都重新下载。 */
-    const { error } = await supabase.storage.from(BUCKET).upload(path, file, {
+    const uploadOriginal = supabase.storage.from(BUCKET).upload(path, file, {
       cacheControl: '31536000',
-      upsert: false
+      upsert: false,
+      contentType: file.type || undefined
     })
 
-    if (error) {
-      fail('上传照片失败', error)
-      return { url: null, error }
-    }
-
-    /* 缩略图在后台补传，**不阻塞发布**。
-       原来这里是 await：每张图要解码两次、编码两次、传两次才发得出去，
-       她那边（旧一点的 iPhone）上传因此明显变慢。
-       缩略图只是给列表加速用的，晚一两秒没关系；
-       万一没传上去，显示端会自己退回原图。 */
-    const dot = path.lastIndexOf('.')
-    const thumbPath = dot > 0 ? `${path.slice(0, dot)}-t.jpg` : `${path}-t.jpg`
-    void (async () => {
+    /* 缩略图：以前是完全撒手不管的后台补传，列表可能先拿到一个 404，
+       显示端（首页卡片）会直接显示占位图。现在等它传完再返回 URL，
+       但生成和上传与原图并行，不会把两次串行。
+       缩略图只是加速；万一压不出来，就把原图字节再传一份到 -t.jpg，
+       保证「有原图就一定有缩略图」这个约定成立。 */
+    const uploadThumb = (async () => {
+      if (!isThumbable) return
       try {
         const thumb = await makeThumb(file)
-        await supabase.storage.from(BUCKET).upload(thumbPath, thumb, {
+        const { error } = await supabase.storage.from(BUCKET).upload(thumbPath, thumb, {
           cacheControl: '31536000',
-          upsert: true
+          upsert: true,
+          contentType: 'image/jpeg'
         })
-      } catch {
-        /* 只是加速，失败就算了 */
+        if (error) throw error
+      } catch (e) {
+        // 退而求其次：原图复制成缩略图，至少地址不会 404
+        const { error } = await supabase.storage.from(BUCKET).upload(thumbPath, file, {
+          cacheControl: '31536000',
+          upsert: true,
+          contentType: file.type || undefined
+        })
+        if (error) fail('补传缩略图失败（列表里可能显示占位图）', error)
+        else console.warn('[青桃] 缩略图没生成出来，先用原图顶上：', e)
       }
     })()
+
+    const [original] = await Promise.all([uploadOriginal, uploadThumb])
+    if (original.error) {
+      fail('上传照片失败', original.error)
+      return { url: null, error: original.error }
+    }
 
     const { data } = supabase.storage.from(BUCKET).getPublicUrl(path)
     return { url: data.publicUrl, error: null }
@@ -193,6 +286,7 @@ export const supabaseSource: FeedSource = {
     const { data, error } = await supabase
       .from('milktea_requests')
       .select('*')
+      .is('revoked_at', null)
       .order('created_at', { ascending: false })
       .limit(60)
     if (error) fail('读取奶茶券请求失败', error)
@@ -211,12 +305,13 @@ export const supabaseSource: FeedSource = {
 
   async resolveMilkteaRequest(id, status: Exclude<RequestStatus, 'pending'>) {
     const uid = await myId()
-    const { error } = await supabase
-      .from('milktea_requests')
-      .update({ status, resolver: uid, resolved_at: new Date().toISOString() })
-      .eq('id', id)
-    if (error) fail('审批奶茶券请求失败', error)
-    return { error }
+    if (!uid) return { error: '未登录' }
+    return updateOrFail(
+      'milktea_requests',
+      { status, resolver: uid, resolved_at: new Date().toISOString() },
+      id,
+      '审批奶茶券请求失败'
+    )
   },
 
   /* —— 亲亲 —— */
@@ -224,6 +319,7 @@ export const supabaseSource: FeedSource = {
     const { data, error } = await supabase
       .from('kisses')
       .select('*')
+      .is('revoked_at', null)
       .order('created_at', { ascending: false })
       .limit(200)
     if (error) fail('读取亲亲记录失败', error)
@@ -246,18 +342,17 @@ export const supabaseSource: FeedSource = {
 
   async resolveKiss(id, status: 'approved' | 'rejected') {
     const uid = await myId()
-    const { error } = await supabase
-      .from('kisses')
-      .update({ status, resolver: uid, resolved_at: new Date().toISOString() })
-      .eq('id', id)
-    if (error) fail('处理亲亲请求失败', error)
-    return { error }
+    if (!uid) return { error: '未登录' }
+    return updateOrFail(
+      'kisses',
+      { status, resolver: uid, resolved_at: new Date().toISOString() },
+      id,
+      '处理亲亲请求失败'
+    )
   },
 
   async redeemKiss(id): Promise<{ error: unknown }> {
-    const { error } = await supabase.from('kisses').update({ redeemed: true }).eq('id', id)
-    if (error) fail('兑现亲亲失败', error)
-    return { error }
+    return updateOrFail('kisses', { redeemed: true }, id, '兑现亲亲失败')
   },
 
   /* —— 心愿 —— */
@@ -265,6 +360,7 @@ export const supabaseSource: FeedSource = {
     const { data, error } = await supabase
       .from('wishes')
       .select('*')
+      .is('revoked_at', null)
       .order('created_at', { ascending: false })
       .limit(100)
     if (error) fail('读取心愿失败', error)
@@ -282,12 +378,12 @@ export const supabaseSource: FeedSource = {
   },
 
   async setWishDone(id, done: boolean): Promise<{ error: unknown }> {
-    const { error } = await supabase
-      .from('wishes')
-      .update({ done, done_at: done ? new Date().toISOString() : null })
-      .eq('id', id)
-    if (error) fail('更新心愿失败', error)
-    return { error }
+    return updateOrFail(
+      'wishes',
+      { done, done_at: done ? new Date().toISOString() : null },
+      id,
+      '更新心愿失败'
+    )
   },
 
   /* —— 矛盾记录 —— */
@@ -295,6 +391,7 @@ export const supabaseSource: FeedSource = {
     const { data, error } = await supabase
       .from('conflicts')
       .select('*')
+      .is('revoked_at', null)
       .order('created_at', { ascending: false })
       .limit(40)
     if (error) fail('读取矛盾失败', error)
@@ -313,6 +410,7 @@ export const supabaseSource: FeedSource = {
     const { data, error } = await supabase
       .from('conflict_notes')
       .select('*')
+      .is('revoked_at', null)
       .order('created_at', { ascending: true })
       .limit(200)
     if (error) fail('读取矛盾记录失败', error)
@@ -334,12 +432,12 @@ export const supabaseSource: FeedSource = {
   },
 
   async setConflictStatus(id, status: ConflictStatus): Promise<{ error: unknown }> {
-    const { error } = await supabase
-      .from('conflicts')
-      .update({ status, updated_at: new Date().toISOString() })
-      .eq('id', id)
-    if (error) fail('更新矛盾状态失败', error)
-    return { error }
+    return updateOrFail(
+      'conflicts',
+      { status, updated_at: new Date().toISOString() },
+      id,
+      '更新矛盾状态失败'
+    )
   },
 
   /* ============================================================
@@ -426,14 +524,16 @@ export const supabaseSource: FeedSource = {
   async adminPurge(table: string, id: string): Promise<{ error: unknown }> {
     if (!(ADMIN_TABLES as readonly string[]).includes(table)) return { error: '不允许的表' }
 
-    // events 和 亲亲请愿 都可能带图片文件，一起删，不然桶里会留垃圾
+    // 先把图片地址取出来；**删完行再删文件**，否则删除被策略挡住时，
+    // 数据还在、图已经没了（看起来像「删了但没删干净」）。
+    let photoUrls: string[] = []
     if (table === 'events') {
       const { data } = await supabase.from('events').select('photo_urls').eq('id', id).maybeSingle()
-      await removePhotos(((data as { photo_urls?: string[] } | null)?.photo_urls ?? []) as string[])
+      photoUrls = ((data as { photo_urls?: string[] } | null)?.photo_urls ?? []) as string[]
     } else if (table === 'kisses') {
       const { data } = await supabase.from('kisses').select('photo_url').eq('id', id).maybeSingle()
       const url = (data as { photo_url?: string | null } | null)?.photo_url
-      if (url) await removePhotos([url])
+      if (url) photoUrls = [url]
     }
 
     /* 关键：把删掉的行取回来数一数。
@@ -447,65 +547,90 @@ export const supabaseSource: FeedSource = {
     if (!data || data.length === 0) {
       return { error: '数据库一行都没删掉——后台的删除策略可能还没生效' }
     }
+    if (photoUrls.length) await removePhotos(photoUrls)
     return { error: null }
   },
 
   async adminPurgeRevoked(): Promise<{ count: number; error: unknown }> {
+    // 先记下 id → 图片地址；只删「真的删掉了」的那些行的文件，
+    // 免得策略挡住删除时数据还在、图先没了。
+    const photoByKey = new Map<string, string[]>()
     const { data: evs, error: readErr } = await supabase
       .from('events')
-      .select('photo_urls')
+      .select('id, photo_urls')
       .not('revoked_at', 'is', null)
     if (readErr) fail('读取已撤销照片失败', readErr)
+    for (const e of (evs ?? []) as { id: string; photo_urls?: string[] }[]) {
+      if (e.photo_urls?.length) photoByKey.set(`events:${e.id}`, e.photo_urls)
+    }
 
     const { data: ks } = await supabase
       .from('kisses')
-      .select('photo_url')
+      .select('id, photo_url')
       .not('revoked_at', 'is', null)
-    await removePhotos([
-      ...((evs ?? []) as { photo_urls?: string[] }[]).flatMap((e) => e.photo_urls ?? []),
-      ...((ks ?? []) as { photo_url?: string | null }[])
-        .map((k) => k.photo_url)
-        .filter((u): u is string => !!u)
-    ])
+    for (const k of (ks ?? []) as { id: string; photo_url?: string | null }[]) {
+      if (k.photo_url) photoByKey.set(`kisses:${k.id}`, [k.photo_url])
+    }
 
     let count = 0
+    let firstError: unknown = null
+    const deletedKeys: string[] = []
     for (const t of ADMIN_TABLES) {
       const { data, error } = await supabase
         .from(t)
         .delete()
         .not('revoked_at', 'is', null)
         .select('id')
-      if (error) fail(`清空已撤销失败（${t}）`, error)
-      count += (data ?? []).length
+      if (error) {
+        fail(`清空已撤销失败（${t}）`, error)
+        if (!firstError) firstError = error
+      }
+      for (const row of (data ?? []) as { id: string }[]) {
+        deletedKeys.push(`${t}:${row.id}`)
+        count += 1
+      }
     }
-    return { count, error: null }
+    await removePhotos(deletedKeys.flatMap((k) => photoByKey.get(k) ?? []))
+    return { count, error: firstError }
   },
 
   async adminPurgeBefore(before: string): Promise<{ count: number; error: unknown }> {
     // 传进来的是本地那天的 00:00，转成 ISO 再比
     const iso = new Date(`${before}T00:00:00`).toISOString()
 
+    const photoByKey = new Map<string, string[]>()
     const { data: evs, error: readErr } = await supabase
       .from('events')
-      .select('photo_urls')
+      .select('id, photo_urls')
       .lt('created_at', iso)
     if (readErr) fail('读取待删照片失败', readErr)
-
-    const { data: ks } = await supabase.from('kisses').select('photo_url').lt('created_at', iso)
-    await removePhotos([
-      ...((evs ?? []) as { photo_urls?: string[] }[]).flatMap((e) => e.photo_urls ?? []),
-      ...((ks ?? []) as { photo_url?: string | null }[])
-        .map((k) => k.photo_url)
-        .filter((u): u is string => !!u)
-    ])
+    for (const e of (evs ?? []) as { id: string; photo_urls?: string[] }[]) {
+      if (e.photo_urls?.length) photoByKey.set(`events:${e.id}`, e.photo_urls)
+    }
+    const { data: ks } = await supabase
+      .from('kisses')
+      .select('id, photo_url')
+      .lt('created_at', iso)
+    for (const k of (ks ?? []) as { id: string; photo_url?: string | null }[]) {
+      if (k.photo_url) photoByKey.set(`kisses:${k.id}`, [k.photo_url])
+    }
 
     let count = 0
+    let firstError: unknown = null
+    const deletedKeys: string[] = []
     for (const t of ADMIN_TABLES) {
       const { data, error } = await supabase.from(t).delete().lt('created_at', iso).select('id')
-      if (error) fail(`按时间清空失败（${t}）`, error)
-      count += (data ?? []).length
+      if (error) {
+        fail(`按时间清空失败（${t}）`, error)
+        if (!firstError) firstError = error
+      }
+      for (const row of (data ?? []) as { id: string }[]) {
+        deletedKeys.push(`${t}:${row.id}`)
+        count += 1
+      }
     }
-    return { count, error: null }
+    await removePhotos(deletedKeys.flatMap((k) => photoByKey.get(k) ?? []))
+    return { count, error: firstError }
   }
 }
 

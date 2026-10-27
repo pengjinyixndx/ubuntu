@@ -33,9 +33,11 @@
           />
         </div>
 
-        <button class="btn-stamp" type="submit">登 录</button>
+        <button class="btn-stamp" type="submit" :disabled="submitting">
+          {{ submitting ? '正在登录…' : '登 录' }}
+        </button>
 
-        <p v-if="msg" class="msg">{{ msg }}</p>
+        <p v-if="msg" class="msg" role="alert">{{ msg }}</p>
       </form>
 
       <div class="card-foot">只属于两个人的信</div>
@@ -56,20 +58,54 @@ const { resetPetition } = usePetition()
 const email = ref('')
 const password = ref('')
 const msg = ref('')
+const submitting = ref(false)
+
+/** 把 Supabase 的英文错误翻成人话；认不出来时给一句能重试的提示 */
+function loginErrorText(error: { message?: string; status?: number } | null): string {
+  const raw = (error?.message ?? '').toLowerCase()
+  if (raw.includes('invalid login credentials') || raw.includes('invalid_grant')) {
+    return '邮箱或密码不对，再核对一下'
+  }
+  if (raw.includes('email not confirmed')) {
+    return '邮箱还没验证，去邮件里点一下确认链接'
+  }
+  if (raw.includes('too many') || raw.includes('rate limit') || error?.status === 429) {
+    return '试得太频繁了，过一会儿再来'
+  }
+  if (raw.includes('fetch') || raw.includes('network') || raw.includes('load failed')) {
+    return '连不上服务器，检查一下网络'
+  }
+  return '登录没成功，再试一次'
+}
 
 const handleLogin = async () => {
+  if (submitting.value) return
   msg.value = ''
-  const { error } = await supabase.auth.signInWithPassword({
-    email: email.value,
-    password: password.value
-  })
-  if (error) {
-    msg.value = error.message
-  } else {
+
+  const mail = email.value.trim()
+  if (!mail || !password.value) {
+    msg.value = '把邮箱和密码都填上吧'
+    return
+  }
+
+  submitting.value = true
+  try {
+    const { error } = await supabase.auth.signInWithPassword({
+      email: mail,
+      password: password.value
+    })
+    if (error) {
+      msg.value = loginErrorText(error)
+      return
+    }
     // 换账号登录前先清干净，否则还是上一个人的档案（两个账号会指向同一个人）
     resetFeed()
     resetPetition()
-    router.push('/')
+    await router.push('/')
+  } catch {
+    msg.value = '连不上服务器，检查一下网络'
+  } finally {
+    submitting.value = false
   }
 }
 </script>
@@ -194,6 +230,13 @@ const handleLogin = async () => {
 
 .btn-stamp:hover {
   background-color: var(--caramel);
+}
+
+.btn-stamp:disabled,
+.btn-stamp:disabled:hover {
+  background-color: var(--faint);
+  cursor: not-allowed;
+  transform: none;
 }
 
 .btn-stamp:active {

@@ -245,14 +245,16 @@ onMounted(() => {
   padding: 7px 9px 9px;
 }
 .cell-cap {
+  display: block;
   font-family: var(--font-hand);
   font-size: var(--fs-xs);
   line-height: 1.5;
   color: var(--ink-soft);
-  display: -webkit-box;
-  -webkit-line-clamp: 2;
-  -webkit-box-orient: vertical;
+  /* 不用 -webkit-line-clamp：display:-webkit-box 同时是 flex item 时，
+     WebKit 的高度计算不可靠（clamp 失效撑开或算成 0）。固定高度 + 裁切更稳。 */
+  max-height: 3em; /* 1.5 行高 × 2 行 */
   overflow: hidden;
+  word-break: break-word;
 }
 .cell-day {
   font-family: var(--font-typewriter);

@@ -1,6 +1,16 @@
 import type { EventType, Gender } from '../types/domain'
 
-/** 卡片抬头里的发布者称呼：自己=「我」；对方按自己性别显示「他 / 她」 */
+/**
+ * 卡片抬头里的发布者称呼：自己=「我」；对方按 ta 的性别显示「他 / 她」。
+ *
+ * 以前是拿「性别是否相同」来判断是不是我，这有两个硬伤：
+ * 1) 很多调用点只传了前三参（没有 partnerId），actorGender 取不到，
+ *    于是连我自己写的东西也会显示成「他 / 她」；
+ * 2) 数据库里 gender 为空、或者两个账号都被写成了同一个值时，
+ *    两个人都可能被判成「我」。
+ * 所以先按 id 认人，性别只用来决定「他 / 她」。id 认不出来时宁可说
+ * 「对方」，也不猜成「我」。
+ */
 export function actorLabel(
   actorId: string,
   myId: string,
@@ -8,20 +18,26 @@ export function actorLabel(
   partnerId?: string | null,
   partnerGender?: Gender | null
 ): string {
-  /* 只用性别判断"是不是我"（两个账号的性别是确定的）。
-     内容的归属仍然看 id，这里只是显示。
-     1) 先弄清发布者是两个人的哪一位，取到 ta 的性别
-     2) 性别和我一致 → 我
-     3) 不一致 → 按发布者的性别显示 他 / 她 */
-  let actorGender: Gender | null | undefined
-  if (partnerId) {
-    actorGender = actorId === partnerId ? partnerGender : myGender
+  if (myId && actorId === myId) return '我'
+
+  if (partnerId && actorId === partnerId) {
+    if (partnerGender === 'female') return '她'
+    if (partnerGender === 'male') return '他'
+    // 对方性别也空着：只能按「和我相反」来推，推不出就老实叫对方
+    if (myGender === 'female') return '他'
+    if (myGender === 'male') return '她'
+    return '对方'
   }
 
-  if (actorGender && myGender && actorGender === myGender) return '我'
+  // 没有 partnerId：这个空间只有两个人，不是我就是对方
+  if (!partnerId) {
+    if (myGender === 'female') return '他'
+    if (myGender === 'male') return '她'
+    return '对方'
+  }
 
-  const g = actorGender ?? (myGender === 'female' ? 'male' : 'female')
-  return g === 'female' ? '她' : '他'
+  // 两个 id 都知道，却都不是 ta —— 旧缓存、后台账号之类的脏数据
+  return '对方'
 }
 
 /** 各事件类型在抬头里的动作短语 */

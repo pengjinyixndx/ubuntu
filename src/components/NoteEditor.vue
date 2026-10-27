@@ -241,13 +241,19 @@ onMounted(() => {
   display: flex;
   align-items: flex-start;
   justify-content: center;
-  padding: 22px 14px 0;
+  padding: 22px 14px calc(18px + env(safe-area-inset-bottom));
+  /* 小屏 / 键盘弹起时整页能滚，别把明信片裁掉 */
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+  overscroll-behavior: contain;
 }
 
 .postcard {
   position: relative;
   width: 100%;
-  aspect-ratio: 4 / 3;
+  /* 不再用 aspect-ratio 由宽度推高度：小屏会被定死、正文被裁。
+     给一个最小高度，内容多了由内容自己撑开。 */
+  min-height: 340px;
   display: flex;
   flex-direction: column;
   gap: 12px;
@@ -385,7 +391,8 @@ onMounted(() => {
 .post-msg {
   flex: 1;
   width: 100%;
-  min-height: 0;
+  /* 最小高度保证小屏也看得见正文；内容再多由 textarea 自己滚 */
+  min-height: 150px;
   resize: none;
   border: none;
   outline: none;

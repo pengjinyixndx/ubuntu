@@ -42,6 +42,16 @@ export interface UploadResult {
   error: unknown
 }
 
+/**
+ * 发布动态的结果。
+ * data 是插入后数据库返回的那一行（带真实 id / created_at），
+ * 调用方可以把它直接插进流里，不必再全量重拉一次。
+ */
+export interface PublishResult {
+  error: unknown
+  data?: CoupleEvent | null
+}
+
 export interface FeedSource {
   /** 读取当前登录者档案；未登录返回 null */
   getMe(): Promise<Profile | null>
@@ -59,7 +69,7 @@ export interface FeedSource {
   /** 拉取动态流，最新在前 */
   listEvents(limit: number): Promise<LoadResult>
   /** 发布一条动态 */
-  addEvent(input: PublishInput): Promise<{ error: unknown }>
+  addEvent(input: PublishInput): Promise<PublishResult>
   /** 上传一张图片，返回可访问地址 */
   uploadPhoto(file: File): Promise<UploadResult>
 

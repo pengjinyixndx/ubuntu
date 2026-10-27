@@ -127,7 +127,7 @@ async function openCamera() {
   }
 
   try {
-    stream = await navigator.mediaDevices.getUserMedia({
+    const ms = await navigator.mediaDevices.getUserMedia({
       video: {
         facingMode: 'environment',
         width: { ideal: 1600 },
@@ -135,13 +135,22 @@ async function openCamera() {
       },
       audio: false
     })
+    // 授权弹窗 / 相机启动期间用户可能已经把相机关掉（video 被 v-if 卸载）。
+    // 这时必须立刻停掉这条流，否则摄像头指示灯会一直亮着。
+    if (!camOpen.value || !videoRef.value) {
+      ms.getTracks().forEach((t) => t.stop())
+      return
+    }
+    stream = ms
     const v = videoRef.value
-    if (!v) return
-    v.srcObject = stream
+    v.srcObject = ms
     await v.play().catch(() => {})
+    // play() 期间也可能被关掉：此时 closeCamera 已经停过流，不要再置 ready
+    if (!camOpen.value) return
     ready.value = true
   } catch (e) {
-    camError.value = cameraErrorText(e)
+    // 已经关掉相机就没必要再弹错误了
+    if (camOpen.value) camError.value = cameraErrorText(e)
   }
 }
 

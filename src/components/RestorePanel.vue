@@ -10,7 +10,7 @@
       <li v-for="k in items" :key="k.id" class="row">
         <div class="row-body">
           <p class="row-main">{{ kindOf(k.type) }}<span v-if="k.content">：{{ k.content }}</span></p>
-          <p class="row-time">{{ dateTimeLabel(k.created_at) }} 发的 · {{ dateTimeLabel(k.revoked_at || '') }} 删的</p>
+          <p class="row-time">{{ dateTimeLabel(k.created_at) }} 发的 · {{ k.revoked_at ? dateTimeLabel(k.revoked_at) : '—' }} 删的</p>
         </div>
         <button type="button" class="btn" :disabled="busy === k.id" @click="restore(k.id)">
           恢复
@@ -117,9 +117,9 @@ onMounted(load)
   font-size: var(--fs-sm);
   line-height: 1.7;
   color: var(--ink);
-  display: -webkit-box;
-  -webkit-line-clamp: 2;
-  -webkit-box-orient: vertical;
+  /* 不用 -webkit-line-clamp：display:-webkit-box 同时是 flex item 时，
+     WebKit 的高度计算不可靠（clamp 失效撑开或算成 0）。固定高度 + 裁切更稳。 */
+  max-height: 3.4em; /* 1.7 行高 × 2 行 */
   overflow: hidden;
   word-break: break-word;
 }

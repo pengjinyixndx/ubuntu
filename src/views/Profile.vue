@@ -89,7 +89,8 @@
         <span class="section-note">共 {{ wishes.length }} 个</span>
       </header>
 
-      <div v-if="loading && !wishes.length" class="wish-list">
+      <!-- 骨架只在「第一次」加载时露一次；之后实时兜底轮询是静默刷新，不再闪 -->
+      <div v-if="!hasLoadedOnce && !wishes.length" class="wish-list">
         <div v-for="i in 3" :key="'skw-' + i" class="wish-item skeleton-row"></div>
       </div>
 
@@ -134,7 +135,7 @@
         <span class="mi-text">设置</span>
         <ChevronRight :size="18" :stroke-width="1.5" class="mi-arrow" />
       </div>
-      <div class="menu-item" @click="handleLogout">
+      <div class="menu-item" @click="askLogout">
         <LogOut :size="18" :stroke-width="1.5" class="mi-icon logout" />
         <span class="mi-text logout">退出登录</span>
       </div>
@@ -154,6 +155,18 @@
 
     <!-- 历史矛盾：和好之后的回看 -->
     <ConflictHistory v-if="showHistory" @close="showHistory = false" />
+
+    <!-- 退出登录：先问一句，避免误触 -->
+    <ConfirmModal
+      v-if="showLogoutConfirm"
+      title="要退出登录吗？"
+      desc="退出后要重新输入邮箱和密码才能进来，这里的数据不会丢。"
+      confirm-text="退出登录"
+      danger
+      :seconds="0"
+      @confirm="doLogout"
+      @cancel="showLogoutConfirm = false"
+    />
   </div>
 </template>
 
@@ -172,6 +185,7 @@ import PhotoWall from '../components/PhotoWall.vue'
 import RulesPanel from '../components/RulesPanel.vue'
 import RestorePanel from '../components/RestorePanel.vue'
 import ConflictHistory from '../components/ConflictHistory.vue'
+import ConfirmModal from '../components/ConfirmModal.vue'
 import Critter from '../components/Critter.vue'
 import { useMilktea } from '../composables/useMilktea'
 import KissBlock from '../components/KissBlock.vue'
@@ -179,7 +193,7 @@ import { actorLabel } from '../lib/eventLabels'
 import { thumbUrlOf, onImageError } from '../lib/image'
 
 const router = useRouter()
-const { events, myProfile, loading, loadEvents, resetFeed } = useFeed()
+const { events, myProfile, loadEvents, resetFeed } = useFeed()
 const { wishList, kissDebt, pendingKisses, pendingRequests, conflicts, conflictNotes, loadPetition, resetPetition } =
   usePetition()
 const { vouchers, iAmHer } = useMilktea()
@@ -261,6 +275,9 @@ const showMilkteaDetail = ref(false)
 const showRules = ref(false)
 const showRestore = ref(false)
 const showHistory = ref(false)
+const showLogoutConfirm = ref(false)
+/** 首次数据是否已经拉完：骨架只在这一次显示，之后轮询刷新保持静默 */
+const hasLoadedOnce = ref(false)
 
 const days = getTogetherDays()
 const displayName = computed(() => myProfile.value?.display_name || '我的账号')
@@ -337,7 +354,12 @@ function onImgError(e: Event) {
   if (img.src !== PLACEHOLDER) img.src = PLACEHOLDER
 }
 
-const handleLogout = async () => {
+function askLogout() {
+  showLogoutConfirm.value = true
+}
+
+const doLogout = async () => {
+  showLogoutConfirm.value = false
   if (!USE_MOCK) {
     await supabase.auth.signOut()
   }
@@ -347,10 +369,18 @@ const handleLogout = async () => {
   router.replace('/login')
 }
 
-onMounted(() => {
+onMounted(async () => {
   // 直入本页（例如刷新在 /profile）时，也保证有数据可展示
-  if (!events.value.length) loadEvents()
-  if (!wishList.value.length) loadPetition()
+  try {
+    const tasks: Promise<unknown>[] = []
+    if (!events.value.length) tasks.push(loadEvents())
+    if (!wishList.value.length) tasks.push(loadPetition())
+    if (tasks.length) await Promise.all(tasks)
+  } catch {
+    /* 拉取失败也把骨架收掉，下面会显示空状态 */
+  } finally {
+    hasLoadedOnce.value = true
+  }
 })
 </script>
 
