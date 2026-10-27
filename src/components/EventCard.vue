@@ -12,7 +12,7 @@
       <!-- 照片：整组 -->
       <div v-if="event.type === 'photo'" class="photo-grid">
         <div v-for="(url, i) in visiblePhotos" :key="i" class="photo-cell">
-          <img :src="imgSrcFor(url)" :data-full="url" alt="照片" loading="lazy" decoding="async" @error="onImgFail($event, url)" />
+          <img :src="imgSrcFor(url)" :data-full="url" alt="照片" loading="lazy" decoding="async" @error="onImgFail($event, url)" @load="onImgLoad($event, url)" />
           <span v-if="i === 2 && restCount > 0" class="photo-more">+{{ restCount }}</span>
         </div>
       </div>
@@ -33,8 +33,8 @@
           <span v-for="c in teaChips" :key="c" class="chip">{{ c }}</span>
         </div>
         <p v-if="event.content" class="content-text">{{ event.content }}</p>
-        <div v-if="singlePhoto" class="note-photo">
-          <img :src="imgSrcFor(singlePhoto)" :data-full="singlePhoto" alt="这一杯" loading="lazy" decoding="async" @error="onImgFail($event, singlePhoto)" />
+        <div v-if="singlePhoto" class="note-photo" :style="photoStyle(singlePhoto)">
+          <img :src="imgSrcFor(singlePhoto)" :data-full="singlePhoto" alt="这一杯" loading="lazy" decoding="async" @error="onImgFail($event, singlePhoto)" @load="onImgLoad($event, singlePhoto)" />
         </div>
       </div>
 
@@ -61,7 +61,7 @@
 
         <p v-if="kissReason" class="kiss-reason">{{ kissReason }}</p>
 
-        <div v-if="singlePhoto" class="note-photo">
+        <div v-if="singlePhoto" class="note-photo" :style="photoStyle(singlePhoto)">
           <img
             :src="thumbUrlOf(singlePhoto)"
             :data-full="singlePhoto"
@@ -80,8 +80,8 @@
         </div>
         <p v-if="event.content" class="content-text">{{ event.content }}</p>
         <!-- 随笔可选带一张随手拍 -->
-        <div v-if="singlePhoto" class="note-photo">
-          <img :src="imgSrcFor(singlePhoto)" :data-full="singlePhoto" alt="随手拍" loading="lazy" decoding="async" @error="onImgFail($event, singlePhoto)" />
+        <div v-if="singlePhoto" class="note-photo" :style="photoStyle(singlePhoto)">
+          <img :src="imgSrcFor(singlePhoto)" :data-full="singlePhoto" alt="随手拍" loading="lazy" decoding="async" @error="onImgFail($event, singlePhoto)" @load="onImgLoad($event, singlePhoto)" />
         </div>
       </template>
 
@@ -158,6 +158,18 @@ const isKiss = computed(() => props.event.type === 'kiss')
    以前是改 img.src 兜底，但组件每次重新渲染会把 src 绑回坏地址，
    于是失败—占位—重绑—再失败，一直闪。改成由状态决定显示什么。 */
 const failedUrls = ref<string[]>([])
+/* 每张照片自己的宽高比。比例来自图片本身（固有数字），
+   不依赖布局 —— 所以既能按真实比例显示、又不会引起重算。 */
+const ratios = ref<Record<string, number>>({})
+function onImgLoad(e: Event, url: string): void {
+  const img = e.currentTarget as HTMLImageElement
+  if (!img.naturalWidth || !img.naturalHeight || ratios.value[url]) return
+  ratios.value = { ...ratios.value, [url]: img.naturalWidth / img.naturalHeight }
+}
+function photoStyle(url: string): Record<string, string> {
+  const r = ratios.value[url]
+  return r ? { aspectRatio: String(r) } : {}
+}
 function imgSrcFor(url: string): string {
   if (!url) return IMAGE_PLACEHOLDER
   return failedUrls.value.includes(url) ? IMAGE_PLACEHOLDER : thumbUrlOf(url)
@@ -356,8 +368,7 @@ function onImgError(e: Event) {
 
 /* —— 喝奶茶：要让里面的照片也能跟着卡片伸缩 —— */
 .tea {
-  flex: 1 1 auto;
-  min-height: 0;
+  flex: 0 0 auto;
   display: flex;
   flex-direction: column;
 }
@@ -419,21 +430,27 @@ function onImgError(e: Event) {
 /* —— 随笔的一张随手拍 ——
    不给它裁切：图片按原比例缩到能放下的最大尺寸，整张贴上去（不裁、不变形）。
    容器是居中弹性盒，图自己按 max-width/max-height 双向收敛。 */
+/* 照片区：高度**算死**（由卡片高度减掉抬头+正文+内边距得出），
+   不由内容撑。这样无论照片是什么比例，都不会出现
+   「框的高度等图片、图片的高度等框」的互相推导 —— 那正是闪烁的来源。 */
 .note-photo {
-  flex: 1 1 auto;
-  min-height: 0;
-  margin-top: 10px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
+  /* 高度由照片自己的宽高比决定（加载后才知道，写在行内 style 上）；
+     加载前用 4:3 占位，避免跳动。
+     上限仍由卡片高度兜住，所以再高的图也不会撑破卡片。 */
+  position: relative;
+  flex: 0 0 auto;
+  aspect-ratio: 4 / 3;
+  max-height: calc(var(--card-max, 260px) - 100px);
+  min-height: 90px;
+  margin-top: 8px;
   overflow: hidden;
 }
 .note-photo img {
+  position: absolute;
+  inset: 0;
   display: block;
-  width: auto;
-  height: auto;
-  max-width: 100%;
-  max-height: 100%;
+  width: 100%;
+  height: 100%;
   object-fit: contain;
   border: var(--border);
   border-radius: var(--r-sm);
