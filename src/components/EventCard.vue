@@ -357,7 +357,6 @@ function onImgError(e: Event) {
 .tea {
   flex: 1 1 auto;
   min-height: 0;
-  overflow: hidden;
   display: flex;
   flex-direction: column;
 }
@@ -419,23 +418,21 @@ function onImgError(e: Event) {
 /* —— 随笔的一张随手拍 ——
    不给它裁切：图片按原比例缩到能放下的最大尺寸，整张贴上去（不裁、不变形）。
    容器是居中弹性盒，图自己按 max-width/max-height 双向收敛。 */
-/* 注意：这里是**定高 + 图片绝对定位**。
-   以前是 min-height: 0 + img 的 max-height: 100% —— 容器高度等图片、
-   图片高度等容器，浏览器会一直重算，表现就是卡片闪烁、版面被不停往上拉。
-   图片绝对定位之后就退出了这个循环，仍然按比例完整显示（object-fit: contain）。 */
 .note-photo {
-  position: relative;
   flex: 1 1 auto;
-  min-height: 88px;
+  min-height: 0;
   margin-top: 10px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
   overflow: hidden;
 }
 .note-photo img {
-  position: absolute;
-  inset: 0;
   display: block;
-  width: 100%;
-  height: 100%;
+  width: auto;
+  height: auto;
+  max-width: 100%;
+  max-height: 100%;
   object-fit: contain;
   border: var(--border);
   border-radius: var(--r-sm);
