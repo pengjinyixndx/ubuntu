@@ -1,6 +1,6 @@
 <template>
   <Teleport to="body">
-    <div class="overlay">
+    <div class="overlay" role="dialog" aria-modal="true" :aria-label="title">
       <header class="bar">
         <button type="button" class="icon-btn" @click="emit('close')" aria-label="关闭">
           <X :size="22" :stroke-width="1.6" />
@@ -18,9 +18,12 @@
 
 <script setup lang="ts">
 import { X } from 'lucide-vue-next'
+import { useEscapeKey } from '../composables/useEscapeKey'
 
 defineProps<{ title: string }>()
 const emit = defineEmits<{ close: [] }>()
+
+useEscapeKey(() => true, () => emit('close'), 110)
 </script>
 
 <style scoped>

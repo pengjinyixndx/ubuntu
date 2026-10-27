@@ -1,6 +1,6 @@
 <template>
   <Teleport to="body">
-    <div class="mask">
+    <div class="mask" role="dialog" aria-modal="true" aria-label="暂停与和好">
       <!-- 第一步：那封"信" -->
       <div v-if="step === 'letter'" class="sheet">
         <header class="head">
@@ -63,6 +63,7 @@ import { useFeed } from '../composables/useFeed'
 import { useMilktea } from '../composables/useMilktea'
 import { dateTimeLabel, timeLabel } from '../lib/eventLabels'
 import { thumbUrlOf, onImageError } from '../lib/image'
+import { useEscapeKey } from '../composables/useEscapeKey'
 import Critter from './Critter.vue'
 
 const emit = defineEmits<{ close: []; done: [] }>()
@@ -177,6 +178,9 @@ async function makeUp() {
 function close() {
   emit('close')
 }
+
+/* Esc 只收起这一层，不等于「和好」 */
+useEscapeKey(() => true, close, 460)
 </script>
 
 <style scoped>

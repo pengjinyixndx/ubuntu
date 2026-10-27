@@ -24,8 +24,8 @@
     </div>
 
     <p class="foot">
-      <span v-if="iAmHer">小螃蟹欠你 <b>{{ kissDebt + pending }}</b> 个亲亲</span>
-      <span v-else>你欠银杏叶 <b>{{ kissDebt + pending }}</b> 个亲亲</span>
+      <span v-if="iAmHer">你记着小螃蟹 <b>{{ kissDebt + pending }}</b> 个亲亲</span>
+      <span v-else>银杏叶记着你 <b>{{ kissDebt + pending }}</b> 个亲亲</span>
       <span v-if="iAmHer" class="dot">·</span>
       <span v-if="iAmHer">今天还能点 <b>{{ leftNow }}</b> 次</span>
     </p>

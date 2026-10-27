@@ -20,7 +20,15 @@
 
     <div v-else class="wall">
       <figure v-for="p in photos" :key="p.id" class="cell" @click="big = p">
-        <div class="cell-img">
+        <div
+          class="cell-img"
+          role="button"
+          tabindex="0"
+          :aria-label="`看大图：${p.caption || '照片'}`"
+          @click.stop="big = p"
+          @keydown.enter.stop.prevent="big = p"
+          @keydown.space.stop.prevent="big = p"
+        >
           <img :src="thumbUrlOf(p.url)" :data-full="p.url" :alt="p.caption || '照片'" loading="lazy" decoding="async" @error="onImageError" />
         </div>
         <figcaption class="cell-foot">

@@ -101,6 +101,30 @@ textarea:focus {
   outline: none;
 }
 
+/* —— 键盘焦点：给 div[role=button] / li 这类可聚焦元素一个看得见的位置 —— */
+:focus-visible {
+  outline: 2px solid var(--caramel);
+  outline-offset: 2px;
+}
+
+/* —— 系统开了「减少动态效果」：停掉装饰性的循环动画 ——
+   螃蟹走路 / 银杏叶摆动 / 爱心跳动 / 骨架 shimmer、pulse / 奶茶热气 / 小生物爬动 */
+@media (prefers-reduced-motion: reduce) {
+  .critter.crab,
+  .critter.ginkgo,
+  .crab-wrap.hit,
+  .crab-wrap.dizzy,
+  .kiss-heart,
+  .sk-line,
+  .skeleton-row,
+  .todo-dot,
+  .flash-steam i,
+  .crawler,
+  .spin {
+    animation: none !important;
+  }
+}
+
 /* —— 滚动条收敛 —— */
 ::-webkit-scrollbar {
   width: 6px;

@@ -1,5 +1,13 @@
 <template>
-  <div class="mcard" :class="{ compact, clickable }" @click="clickable && emit('open')">
+  <div
+    class="mcard"
+    :class="{ compact, clickable }"
+    :role="clickable ? 'button' : undefined"
+    :tabindex="clickable ? 0 : undefined"
+    @click="open"
+    @keydown.enter.prevent="open"
+    @keydown.space.prevent="open"
+  >
     <!-- 她的符号：银杏叶，做个小水印 -->
     <Critter kind="ginkgo" :size="compact ? 16 : 18" class="mcard-leaf" />
 
@@ -46,33 +54,60 @@
 </template>
 
 <script setup lang="ts">
-import { computed, onMounted } from 'vue'
+import { computed, onMounted, watchEffect } from 'vue'
 import { CupSoda, ChevronRight } from 'lucide-vue-next'
 import { useMilktea } from '../composables/useMilktea'
 import { useFeed } from '../composables/useFeed'
+import { useNow } from '../composables/useNow'
 import Critter from './Critter.vue'
 
-withDefaults(defineProps<{ compact?: boolean; clickable?: boolean }>(), {
+const props = withDefaults(defineProps<{ compact?: boolean; clickable?: boolean }>(), {
   compact: false,
   clickable: false
 })
 
 const emit = defineEmits<{ open: [] }>()
+function open() {
+  if (props.clickable) emit('open')
+}
 
-const { drinkable, freeRemaining, voucherBalance, issuedCount, vouchersUsed } = useMilktea()
+const {
+  drinkable,
+  freeRemaining,
+  voucherBalance,
+  issuedCount,
+  vouchersUsed,
+  vouchersExpired
+} = useMilktea()
+const now = useNow()
 
 /**
  * 每周那张券会"随着一周过去慢慢变旧"：
  * 周一刚发下来是新的，到周末纸就发黄发淡了。时间用纸的颜色表现，不写文字。
+ * 必须依赖 now：否则跨过周一 / 挂后台过夜后，纸色会一直停在第一次求值那天。
  */
 const weekWear = computed(() => {
-  const day = (new Date().getDay() + 6) % 7 // 周一 0 … 周日 6
+  const day = (new Date(now.value).getDay() + 6) % 7 // 周一 0 … 周日 6
   const worn = day / 6
   return {
     filter: `sepia(${(worn * 0.35).toFixed(2)}) saturate(${(1 - worn * 0.25).toFixed(2)})`,
     opacity: String((1 - worn * 0.22).toFixed(2))
   }
 })
+
+/* 开发期护栏：他发的券必须恰好被「已用 / 可用 / 过期」分完。
+   以后改规则（比如再加一种状态）时，一旦漏算，控制台会立刻报出来，
+   而不是等到她拿两张截图对不上账。 */
+if (import.meta.env.DEV) {
+  watchEffect(() => {
+    const accounted = vouchersUsed.value + voucherBalance.value + vouchersExpired.value
+    if (accounted !== issuedCount.value) {
+      console.warn(
+        `[青桃] 奶茶券口径漂移：已用 ${vouchersUsed.value} + 可用 ${voucherBalance.value} + 过期 ${vouchersExpired.value} = ${accounted}，但发出的券是 ${issuedCount.value} 张`
+      )
+    }
+  })
+}
 
 // 奶茶卡是靠 events 推出来的，直接进记录页时 events 可能还没拉，这里兜一下
 const { events, loadEvents } = useFeed()

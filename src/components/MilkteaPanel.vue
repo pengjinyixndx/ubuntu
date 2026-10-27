@@ -93,6 +93,7 @@ import { useMilktea } from '../composables/useMilktea'
 import { usePetition } from '../composables/usePetition'
 import { useFeed } from '../composables/useFeed'
 import { actorLabel, dateTimeLabel, timeLabel } from '../lib/eventLabels'
+import { useVoucherExpiry } from '../composables/useVoucherExpiry'
 import PanelShell from './PanelShell.vue'
 import MilkteaCard from './MilkteaCard.vue'
 import MilkteaDetail from './MilkteaDetail.vue'
@@ -111,7 +112,8 @@ const {
 } = usePetition()
 
 const reason = ref('')
-const expiresAt = ref(defaultExpiry())
+/** 到期日和弹窗共用同一个来源：在哪边改，另一边都看得见 */
+const { expiresAt } = useVoucherExpiry()
 const busy = ref(false)
 const msg = ref('')
 const isErr = ref(false)
@@ -125,13 +127,6 @@ const myPending = computed(() =>
 const history = computed(() =>
   requests.value.filter((r: MilkteaRequest) => r.status !== 'pending').slice(0, 6)
 )
-
-/** 默认七天 */
-function defaultExpiry(): string {
-  const d = new Date(Date.now() + 7 * 86400000)
-  const p = (n: number) => String(n).padStart(2, '0')
-  return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}`
-}
 
 function who(id: string): string {
   return actorLabel(id, myProfile.value?.id ?? '', myProfile.value?.gender)

@@ -8,9 +8,10 @@
       </div>
       <div class="cell">
         <span class="cell-num">{{ kissDebt }}</span>
-        <span class="cell-label">欠着的亲亲</span>
+        <span class="cell-label">攒着的亲亲</span>
       </div>
     </section>
+    <p class="sum-note">只往上加，不会少</p>
 
     <!-- 写一张亲亲请愿：这是她的动作，他那边不显示 -->
     <section v-if="iAmHer" class="block">
@@ -93,7 +94,6 @@ const {
   myPendingKisses,
   requestKiss,
   resolveKiss,
-  redeemKiss,
   loadPetition
 } = usePetition()
 
@@ -196,11 +196,6 @@ async function resolve(id: string, status: 'approved' | 'rejected') {
   await resolveKiss(id, status)
   busy.value = false
 }
-async function redeem(id: string) {
-  busy.value = true
-  await redeemKiss(id)
-  busy.value = false
-}
 
 onMounted(loadPetition)
 </script>
@@ -233,6 +228,14 @@ onMounted(loadPetition)
   font-family: var(--font-song);
   font-size: 11px;
   color: var(--muted);
+}
+.sum-note {
+  margin: -7px 2px 0;
+  font-family: var(--font-hand);
+  font-size: var(--fs-xs);
+  letter-spacing: 0.5px;
+  color: var(--faint);
+  text-align: center;
 }
 
 .block {

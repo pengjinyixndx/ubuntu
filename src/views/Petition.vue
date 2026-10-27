@@ -104,7 +104,7 @@ const entries = computed<Entry[]>(() => {
         ? `${kissWaiting} 个等你说好`
         : myWaiting
           ? `${myWaiting} 个等回话`
-          : `欠着 ${kissDebt.value} 个亲亲`,
+          : `记着 ${kissDebt.value} 个亲亲`,
       icon: Heart,
       badge: kissWaiting,
       alert: kissWaiting > 0

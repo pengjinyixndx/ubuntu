@@ -1,6 +1,6 @@
 <template>
   <Teleport to="body">
-    <div class="overlay">
+    <div class="overlay" role="dialog" aria-modal="true" aria-label="发照片">
       <header class="editor-bar">
         <button type="button" class="icon-btn" @click="emit('close')" aria-label="关闭">
           <X :size="22" :stroke-width="1.6" />
@@ -68,12 +68,14 @@
 import { computed, ref } from 'vue'
 import { X, Loader, Plus } from 'lucide-vue-next'
 import { useFeed } from '../composables/useFeed'
+import { useEscapeKey } from '../composables/useEscapeKey'
 import { shrinkImage, uploadErrorText } from '../lib/image'
 import Critter from './Critter.vue'
 import PhotoPicker from './PhotoPicker.vue'
 import PublishFlash from './PublishFlash.vue'
 
 const emit = defineEmits<{ close: [] }>()
+useEscapeKey(() => true, () => emit('close'), 100)
 const { publishEvent, uploadPhoto } = useFeed()
 
 const MAX = 9

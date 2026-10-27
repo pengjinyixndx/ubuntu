@@ -121,11 +121,14 @@ import EventCard from '../components/EventCard.vue'
 import EventDetail from '../components/EventDetail.vue'
 import { getTogetherDays } from '../composables/useTogether'
 import { getDailyBlessing } from '../composables/useDailyBlessing'
+import { useNow } from '../composables/useNow'
 import { useFeed } from '../composables/useFeed'
 import type { CoupleEvent } from '../types/domain'
 
-const days = getTogetherDays()
-const blessing = getDailyBlessing()
+/** 天数与每日一句都挂在同一个 60 秒 tick 上：过夜后会自己翻页 */
+const clock = useNow()
+const days = computed(() => getTogetherDays(new Date(clock.value)))
+const blessing = computed(() => getDailyBlessing(new Date(clock.value)))
 
 const { events, myProfile, loading, loadEvents } = useFeed()
 

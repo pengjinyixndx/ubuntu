@@ -7,7 +7,9 @@
       <div class="id-info">
         <div class="nickname">{{ displayName }}</div>
         <div class="sub">在一起的第 {{ days }} 天</div>
-        <p v-if="kissDebt > 0" class="debt">还欠着 {{ kissDebt }} 个亲亲</p>
+        <p v-if="kissDebt > 0" class="debt">
+          {{ iAmHer ? '你记着小螃蟹' : '银杏叶记着你' }} {{ kissDebt }} 个亲亲
+        </p>
       </div>
       <div class="stamp">
         <span class="stamp-num">{{ days }}</span>
@@ -39,7 +41,16 @@
         <span class="section-note">{{ todos.length }} 件</span>
       </header>
       <ul class="todo-list">
-        <li v-for="t in todos" :key="t.key" class="todo" @click="openTodo(t)">
+        <li
+          v-for="t in todos"
+          :key="t.key"
+          class="todo"
+          role="button"
+          tabindex="0"
+          @click="openTodo(t)"
+          @keydown.enter.prevent="openTodo(t)"
+          @keydown.space.prevent="openTodo(t)"
+        >
           <span class="todo-dot"></span>
           <span class="todo-text">{{ t.text }}</span>
           <ChevronRight :size="16" :stroke-width="1.6" class="todo-arrow" />
@@ -117,25 +128,53 @@
     <!-- 菜单清单 -->
     <section class="menu">
       <!-- 历史矛盾：和好之后的都收在这儿 -->
-      <div class="menu-item" @click="showHistory = true">
+      <div
+        class="menu-item"
+        role="button"
+        tabindex="0"
+        @click="showHistory = true"
+        @keydown.enter.prevent="showHistory = true"
+        @keydown.space.prevent="showHistory = true"
+      >
         <BookOpen :size="18" :stroke-width="1.5" class="mi-icon" />
         <span class="mi-text">历史矛盾</span>
         <ChevronRight :size="18" :stroke-width="1.5" class="mi-arrow" />
       </div>
 
       <!-- 恢复：自己删掉的内容 -->
-      <div class="menu-item" @click="showRestore = true">
+      <div
+        class="menu-item"
+        role="button"
+        tabindex="0"
+        @click="showRestore = true"
+        @keydown.enter.prevent="showRestore = true"
+        @keydown.space.prevent="showRestore = true"
+      >
         <RotateCcw :size="18" :stroke-width="1.5" class="mi-icon" />
         <span class="mi-text">恢复</span>
         <ChevronRight :size="18" :stroke-width="1.5" class="mi-arrow" />
       </div>
 
-      <div class="menu-item" @click="showRules = true">
+      <div
+        class="menu-item"
+        role="button"
+        tabindex="0"
+        @click="showRules = true"
+        @keydown.enter.prevent="showRules = true"
+        @keydown.space.prevent="showRules = true"
+      >
         <Settings :size="18" :stroke-width="1.5" class="mi-icon" />
         <span class="mi-text">设置</span>
         <ChevronRight :size="18" :stroke-width="1.5" class="mi-arrow" />
       </div>
-      <div class="menu-item" @click="askLogout">
+      <div
+        class="menu-item"
+        role="button"
+        tabindex="0"
+        @click="askLogout"
+        @keydown.enter.prevent="askLogout"
+        @keydown.space.prevent="askLogout"
+      >
         <LogOut :size="18" :stroke-width="1.5" class="mi-icon logout" />
         <span class="mi-text logout">退出登录</span>
       </div>
@@ -188,6 +227,7 @@ import ConflictHistory from '../components/ConflictHistory.vue'
 import ConfirmModal from '../components/ConfirmModal.vue'
 import Critter from '../components/Critter.vue'
 import { useMilktea } from '../composables/useMilktea'
+import { useNow } from '../composables/useNow'
 import KissBlock from '../components/KissBlock.vue'
 import { actorLabel } from '../lib/eventLabels'
 import { thumbUrlOf, onImageError } from '../lib/image'
@@ -197,11 +237,19 @@ const { events, myProfile, loadEvents, resetFeed } = useFeed()
 const { wishList, kissDebt, pendingKisses, pendingRequests, conflicts, conflictNotes, loadPetition, resetPetition } =
   usePetition()
 const { vouchers, iAmHer } = useMilktea()
+/** 60 秒跳一次的「现在」：天数、将到期的东西都跟着它走，挂后台过夜也不会停在昨天 */
+const now = useNow()
+
+const pad2 = (n: number) => String(n).padStart(2, '0')
+function localDay(ms: number): string {
+  const d = new Date(ms)
+  return `${d.getFullYear()}-${pad2(d.getMonth() + 1)}-${pad2(d.getDate())}`
+}
 
 /** 七天内想做、还没完成的心愿 */
 const soonWishes = computed(() => {
-  const soon = Date.now() + 7 * 86400000
-  const today = new Date().toISOString().slice(0, 10)
+  const soon = now.value + 7 * 86400000
+  const today = localDay(now.value)
   return wishList.value.filter(
     (w) =>
       !w.done &&
@@ -212,7 +260,7 @@ const soonWishes = computed(() => {
 })
 /** 三天内到期、还没用掉的券 */
 const soonVouchers = computed(() => {
-  const soon = Date.now() + 3 * 86400000
+  const soon = now.value + 3 * 86400000
   return vouchers.value.filter(
     (v) =>
       !v.usedAt &&
@@ -279,7 +327,7 @@ const showLogoutConfirm = ref(false)
 /** 首次数据是否已经拉完：骨架只在这一次显示，之后轮询刷新保持静默 */
 const hasLoadedOnce = ref(false)
 
-const days = getTogetherDays()
+const days = computed(() => getTogetherDays(new Date(now.value)))
 const displayName = computed(() => myProfile.value?.display_name || '我的账号')
 /** 我是螃蟹还是银杏叶（和首页顶部那两个小家伙同款） */
 const myCritter = computed(() => (myProfile.value?.gender === 'female' ? 'ginkgo' : 'crab'))
@@ -458,7 +506,7 @@ onMounted(async () => {
   color: var(--muted);
 }
 
-/* 欠亲亲：名字下面那一行小字 */
+/* 亲亲：名字下面那一行小字（她记着的次数，不是欠账） */
 .debt {
   margin: 5px 0 0;
   font-family: var(--font-hand);
@@ -773,6 +821,7 @@ onMounted(async () => {
   gap: 12px;
   padding: 15px 18px;
   border-bottom: 1px solid var(--line);
+  cursor: pointer;
 }
 .menu-item:last-child {
   border-bottom: none;

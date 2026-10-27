@@ -1,6 +1,6 @@
 <template>
   <Teleport to="body">
-    <div class="overlay">
+    <div class="overlay" role="dialog" aria-modal="true" aria-label="写日记">
       <header class="editor-bar">
         <button type="button" class="icon-btn" @click="emit('close')" aria-label="关闭">
           <X :size="22" :stroke-width="1.6" />
@@ -76,11 +76,13 @@
 import { computed, onMounted, ref } from 'vue'
 import { X, Loader } from 'lucide-vue-next'
 import { useFeed } from '../composables/useFeed'
+import { useEscapeKey } from '../composables/useEscapeKey'
 import { WEATHERS, MOODS } from '../lib/options'
 import Critter from './Critter.vue'
 import PublishFlash from './PublishFlash.vue'
 
 const emit = defineEmits<{ close: [] }>()
+useEscapeKey(() => true, () => emit('close'), 100)
 const { publishEvent, myProfile, ensureMe } = useFeed()
 
 const text = ref('')

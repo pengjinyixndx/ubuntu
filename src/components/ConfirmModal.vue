@@ -1,7 +1,7 @@
 <template>
   <Teleport to="body">
     <div class="mask" @click.self="emit('cancel')">
-      <div class="sheet">
+      <div class="sheet" role="dialog" aria-modal="true" :aria-label="title">
         <h2 class="title">{{ title }}</h2>
         <p v-if="desc" class="desc">{{ desc }}</p>
 
@@ -30,6 +30,7 @@
 
 <script setup lang="ts">
 import { onBeforeUnmount, onMounted, ref } from 'vue'
+import { useEscapeKey } from '../composables/useEscapeKey'
 
 const props = withDefaults(
   defineProps<{
@@ -47,6 +48,9 @@ const props = withDefaults(
 )
 
 const emit = defineEmits<{ confirm: []; cancel: [] }>()
+
+/* Esc = 取消：叠在面板上时只关这一层（见 useEscapeKey 的栈） */
+useEscapeKey(() => true, () => emit('cancel'), 320)
 
 const left = ref(props.seconds)
 let timer = 0

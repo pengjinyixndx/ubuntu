@@ -3,7 +3,8 @@
 
    规则：
    - 奶茶券：她请求 → 他同意（会真的发一张券）/ 驳回；他也可主动发。
-   - 亲亲：每人每天免费 10 次；超出要对方同意才算；累计成「欠亲亲」。
+   - 亲亲：每人每天免费 10 次；超出要对方同意才算；累计成她想亲的次数
+     （只增不减，不销账——见 redeemKiss 的说明）。
    - 心愿：想做的事 + 想什么时候完成，可标记完成。
    - 矛盾：发起后双方各填一份（什么时候 / 因为什么 / 诉求），
            两份都填完进入「吵架期间」；期间每次打开弹窗展示两份记录，
@@ -22,6 +23,7 @@ import type {
 } from '../types/domain'
 import { getFeedSource } from '../lib/dataSource'
 import { useFeed } from './useFeed'
+import { defaultVoucherExpiry } from './useVoucherExpiry'
 
 /** 每天免费请求亲亲的次数 */
 export const KISS_FREE_PER_DAY = 10
@@ -172,7 +174,11 @@ export function usePetition() {
     }
   }
 
-  /** 审批：同意时会真的发一张券（写一条 milktea_issue 动态，券余额才算得上） */
+  /**
+   * 审批：同意时会真的发一张券（写一条 milktea_issue 动态，券余额才算得上）。
+   * 到期日由调用方给；没给就用全站同一个默认（今天 + 7 天），
+   * 保证「面板里批准」和「弹窗里批准」写进去的是同一套日期口径。
+   */
   async function resolveRequest(
     id: string,
     status: Exclude<RequestStatus, 'pending'>,
@@ -199,7 +205,7 @@ export function usePetition() {
             meta: {
               count: 1,
               reason: target?.reason ?? null,
-              expires_at: opts?.expires_at ?? null,
+              expires_at: opts?.expires_at || defaultVoucherExpiry(),
               from_request: id
             }
           })
@@ -244,7 +250,7 @@ export function usePetition() {
   /** 我今天还剩几次免费 */
   const freeLeftToday = computed(() => Math.max(0, KISS_FREE_PER_DAY - freeUsedToday.value))
 
-  /** 欠亲亲：还没兑现的（免费 + 已同意）总数 */
+  /** 她记着的亲亲：免费 + 已同意、还没在旧版本里兑现过的总数（只增不减） */
   const kissDebt = computed(() =>
     kisses.value
       .filter((k) => (k.status === 'free' || k.status === 'approved') && !k.redeemed)
@@ -337,6 +343,14 @@ export function usePetition() {
     }
   }
 
+  /**
+   * 兑现一条亲亲（把 redeemed 置 true）。
+   *
+   * 界面上**故意没有入口**：按 PRODUCT.md，这个数字是「她卖一次萌就记一次」
+   * 的玩笑，不是欠账——一加「兑现 / 销账」按钮，这个梗就死了。
+   * 方法保留给旧数据的口径（kissDebt 仍排除历史上已兑现的行），
+   * 新数据只增不减；不要再把它接回 KissPanel。
+   */
   async function redeemKiss(id: string) {
     try {
       const src = await getFeedSource()

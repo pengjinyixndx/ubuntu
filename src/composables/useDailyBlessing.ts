@@ -52,8 +52,8 @@ export const BLESSINGS: Blessing[] = [
 ]
 
 /** 取当天对应的祝福（同一天内保持不变，次日自动更换） */
-export function getDailyBlessing(): Blessing {
-  const day = getTogetherDays()
+export function getDailyBlessing(now: Date = new Date()): Blessing {
+  const day = getTogetherDays(now)
   const index = (day - 1) % BLESSINGS.length
   return BLESSINGS[index]!
 }

@@ -84,14 +84,14 @@ export interface MilkteaRequest {
   revoked_at?: string | null
 }
 
-/** 亲亲：每天免费请求 10 次，超出要对方同意；累积成「欠亲亲」 */
+/** 亲亲：每天免费请求 10 次，超出要对方同意；累积成她记着的次数（只增不减） */
 export interface Kiss {
   id: string
   requester: string
   count: number
   /** free=当天免费额度内；pending=超额度待对方同意 */
   status: 'free' | 'pending' | 'approved' | 'rejected'
-  /** 是否已经兑现过（兑现后不再计入欠账） */
+  /** 旧版本里是否兑现过；新数据没有兑现入口，不再变化 */
   redeemed: boolean
   resolver: string | null
   created_at: string

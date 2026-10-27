@@ -450,32 +450,6 @@ async function uploadPhoto(file: File): Promise<{ url: string | null; error: unk
 }
 
 /**
- * 保存自己的档案。
- * 主要是选「我是谁」——决定看到的是哪一边（她的页面 / 他的页面）。
- */
-async function saveProfile(patch: {
-  gender?: string
-  display_name?: string
-}): Promise<{ error: unknown }> {
-  const myEpoch = epoch
-  try {
-    const source = await getFeedSource()
-    const { error } = await source.updateProfile(patch)
-    if (myEpoch !== epoch) return { error: '账号已切换，档案没有保存' }
-    if (error) return { error }
-    const me = await source.getMe()
-    if (myEpoch === epoch && me) {
-      myProfile.value = me
-      resolveRoles()
-    }
-    return { error: null }
-  } catch (e) {
-    console.error('[青桃] 保存档案失败：', e)
-    return { error: e }
-  }
-}
-
-/**
  * 退出登录 / 换账号时**必须**调一次。
  * 这个 composable 是模块级单例，登录信息会一直留着，
  * 不清掉的话换账号进来还是上一个人的档案和动态（两个人会指向同一个账号）。
@@ -527,7 +501,6 @@ export function useFeed() {
     loadEvents,
     publishEvent,
     uploadPhoto,
-    saveProfile,
     markRevokedId,
     markLocalWrite,
     lastLocalWriteAt,

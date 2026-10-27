@@ -34,6 +34,16 @@ function fail(scope: string, error: unknown) {
   console.error(`[青桃] ${scope}：`, error)
 }
 
+/** 把 Supabase / 网络的错误压成一句能上报的话 */
+function errorText(error: unknown): string {
+  if (!error) return '未知错误'
+  if (typeof error === 'string') return error
+  if (typeof error === 'object' && 'message' in error) {
+    return String((error as { message: unknown }).message)
+  }
+  return String(error)
+}
+
 /**
  * 改一行并确认**真的改到了**。
  * PostgREST 在 RLS 没放行时不会报错、却一行也不改；不把 id 取回来数，
@@ -524,16 +534,25 @@ export const supabaseSource: FeedSource = {
   async adminPurge(table: string, id: string): Promise<{ error: unknown }> {
     if (!(ADMIN_TABLES as readonly string[]).includes(table)) return { error: '不允许的表' }
 
-    // 先把图片地址取出来；**删完行再删文件**，否则删除被策略挡住时，
-    // 数据还在、图已经没了（看起来像「删了但没删干净」）。
+    /* 顺序：先取出图片地址 → 删行（并确认真的删到了）→ 再删文件。
+       反过来先删文件的话，删行被策略挡住时数据还在、图已经没了。 */
     let photoUrls: string[] = []
-    if (table === 'events') {
-      const { data } = await supabase.from('events').select('photo_urls').eq('id', id).maybeSingle()
-      photoUrls = ((data as { photo_urls?: string[] } | null)?.photo_urls ?? []) as string[]
-    } else if (table === 'kisses') {
-      const { data } = await supabase.from('kisses').select('photo_url').eq('id', id).maybeSingle()
-      const url = (data as { photo_url?: string | null } | null)?.photo_url
-      if (url) photoUrls = [url]
+    if (table === 'events' || table === 'kisses') {
+      const read =
+        table === 'events'
+          ? await supabase.from('events').select('photo_urls').eq('id', id).maybeSingle()
+          : await supabase.from('kisses').select('photo_url').eq('id', id).maybeSingle()
+
+      if (read.error) {
+        fail('读取待删图片地址失败（这次没有删行）', read.error)
+        return { error: `读取图片地址失败，没有删行：${errorText(read.error)}` }
+      }
+      if (table === 'events') {
+        photoUrls = ((read.data as { photo_urls?: string[] } | null)?.photo_urls ?? []) as string[]
+      } else {
+        const url = (read.data as { photo_url?: string | null } | null)?.photo_url
+        if (url) photoUrls = [url]
+      }
     }
 
     /* 关键：把删掉的行取回来数一数。
@@ -547,33 +566,44 @@ export const supabaseSource: FeedSource = {
     if (!data || data.length === 0) {
       return { error: '数据库一行都没删掉——后台的删除策略可能还没生效' }
     }
-    if (photoUrls.length) await removePhotos(photoUrls)
+
+    // 行已经删了；文件删不掉也要把错误交回去，别假装全部成功
+    const files = await removePhotos(photoUrls)
+    if (files.error) {
+      return { error: `记录已删除，但图片文件没删掉：${files.error}` }
+    }
     return { error: null }
   },
 
   async adminPurgeRevoked(): Promise<{ count: number; error: unknown }> {
-    // 先记下 id → 图片地址；只删「真的删掉了」的那些行的文件，
-    // 免得策略挡住删除时数据还在、图先没了。
+    // 先把 id → 图片地址取全；取不到就整批不删，免得留下没人认领的图。
     const photoByKey = new Map<string, string[]>()
-    const { data: evs, error: readErr } = await supabase
+    const { data: evs, error: evReadErr } = await supabase
       .from('events')
       .select('id, photo_urls')
       .not('revoked_at', 'is', null)
-    if (readErr) fail('读取已撤销照片失败', readErr)
+    if (evReadErr) {
+      fail('读取已撤销照片失败（这次没有删任何行）', evReadErr)
+      return { count: 0, error: `读取 events 的图片地址失败，整批没有删：${errorText(evReadErr)}` }
+    }
     for (const e of (evs ?? []) as { id: string; photo_urls?: string[] }[]) {
       if (e.photo_urls?.length) photoByKey.set(`events:${e.id}`, e.photo_urls)
     }
 
-    const { data: ks } = await supabase
+    const { data: ks, error: kissReadErr } = await supabase
       .from('kisses')
       .select('id, photo_url')
       .not('revoked_at', 'is', null)
+    if (kissReadErr) {
+      fail('读取已撤销亲亲照片失败（这次没有删任何行）', kissReadErr)
+      return { count: 0, error: `读取 kisses 的图片地址失败，整批没有删：${errorText(kissReadErr)}` }
+    }
     for (const k of (ks ?? []) as { id: string; photo_url?: string | null }[]) {
       if (k.photo_url) photoByKey.set(`kisses:${k.id}`, [k.photo_url])
     }
 
     let count = 0
-    let firstError: unknown = null
+    const errors: string[] = []
     const deletedKeys: string[] = []
     for (const t of ADMIN_TABLES) {
       const { data, error } = await supabase
@@ -583,15 +613,18 @@ export const supabaseSource: FeedSource = {
         .select('id')
       if (error) {
         fail(`清空已撤销失败（${t}）`, error)
-        if (!firstError) firstError = error
+        errors.push(`${t}：${errorText(error)}`)
       }
       for (const row of (data ?? []) as { id: string }[]) {
         deletedKeys.push(`${t}:${row.id}`)
         count += 1
       }
     }
-    await removePhotos(deletedKeys.flatMap((k) => photoByKey.get(k) ?? []))
-    return { count, error: firstError }
+
+    // 只删「这一次真的删掉了」的行的文件
+    const files = await removePhotos(deletedKeys.flatMap((k) => photoByKey.get(k) ?? []))
+    if (files.error) errors.push(`图片文件：${files.error}`)
+    return { count, error: errors.length ? errors.join('；') : null }
   },
 
   async adminPurgeBefore(before: string): Promise<{ count: number; error: unknown }> {
@@ -599,38 +632,46 @@ export const supabaseSource: FeedSource = {
     const iso = new Date(`${before}T00:00:00`).toISOString()
 
     const photoByKey = new Map<string, string[]>()
-    const { data: evs, error: readErr } = await supabase
+    const { data: evs, error: evReadErr } = await supabase
       .from('events')
       .select('id, photo_urls')
       .lt('created_at', iso)
-    if (readErr) fail('读取待删照片失败', readErr)
+    if (evReadErr) {
+      fail('读取待删照片失败（这次没有删任何行）', evReadErr)
+      return { count: 0, error: `读取 events 的图片地址失败，整批没有删：${errorText(evReadErr)}` }
+    }
     for (const e of (evs ?? []) as { id: string; photo_urls?: string[] }[]) {
       if (e.photo_urls?.length) photoByKey.set(`events:${e.id}`, e.photo_urls)
     }
-    const { data: ks } = await supabase
+    const { data: ks, error: kissReadErr } = await supabase
       .from('kisses')
       .select('id, photo_url')
       .lt('created_at', iso)
+    if (kissReadErr) {
+      fail('读取待删亲亲照片失败（这次没有删任何行）', kissReadErr)
+      return { count: 0, error: `读取 kisses 的图片地址失败，整批没有删：${errorText(kissReadErr)}` }
+    }
     for (const k of (ks ?? []) as { id: string; photo_url?: string | null }[]) {
       if (k.photo_url) photoByKey.set(`kisses:${k.id}`, [k.photo_url])
     }
 
     let count = 0
-    let firstError: unknown = null
+    const errors: string[] = []
     const deletedKeys: string[] = []
     for (const t of ADMIN_TABLES) {
       const { data, error } = await supabase.from(t).delete().lt('created_at', iso).select('id')
       if (error) {
         fail(`按时间清空失败（${t}）`, error)
-        if (!firstError) firstError = error
+        errors.push(`${t}：${errorText(error)}`)
       }
       for (const row of (data ?? []) as { id: string }[]) {
         deletedKeys.push(`${t}:${row.id}`)
         count += 1
       }
     }
-    await removePhotos(deletedKeys.flatMap((k) => photoByKey.get(k) ?? []))
-    return { count, error: firstError }
+    const files = await removePhotos(deletedKeys.flatMap((k) => photoByKey.get(k) ?? []))
+    if (files.error) errors.push(`图片文件：${files.error}`)
+    return { count, error: errors.length ? errors.join('；') : null }
   }
 }
 
@@ -642,12 +683,18 @@ function storagePath(url: string): string | null {
   return decodeURIComponent(url.slice(i + marker.length).split('?')[0] ?? '')
 }
 
-/** 把一批图片文件从存储桶里删掉（一次最多 100 个） */
-async function removePhotos(urls: string[]): Promise<void> {
+/** 把一批图片文件从存储桶里删掉（一次最多 100 个）；错误要交回调用方 */
+async function removePhotos(urls: string[]): Promise<{ error: string | null }> {
   const paths = urls.map(storagePath).filter((p): p is string => !!p)
-  if (!paths.length) return
+  if (!paths.length) return { error: null }
+
+  const errors: string[] = []
   for (let i = 0; i < paths.length; i += 100) {
     const { error } = await supabase.storage.from(BUCKET).remove(paths.slice(i, i + 100))
-    if (error) fail('删除图片文件失败', error)
+    if (error) {
+      fail('删除图片文件失败', error)
+      errors.push(errorText(error))
+    }
   }
+  return { error: errors.length ? errors.join('；') : null }
 }

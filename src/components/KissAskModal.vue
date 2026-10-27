@@ -1,7 +1,12 @@
 <template>
   <Teleport to="body">
     <div v-if="currentKiss || currentMilk" class="ask-mask">
-      <div class="ask-box">
+      <div
+        class="ask-box"
+        role="dialog"
+        aria-modal="true"
+        :aria-label="currentKiss ? '亲亲请求' : '奶茶券请求'"
+      >
         <header class="head">
           <Critter kind="ginkgo" :size="22" class="leaf" />
           <span class="head-text">{{ currentKiss ? who(currentKiss.requester) + ' 想亲你' : who(currentMilk!.requester) + ' 想讨一杯奶茶' }}</span>
@@ -34,30 +39,21 @@
 </template>
 
 <script setup lang="ts">
-import { computed, ref } from 'vue'
+import { computed, ref, watch } from 'vue'
 import { usePetition } from '../composables/usePetition'
 import { useFeed } from '../composables/useFeed'
 import { useMilktea } from '../composables/useMilktea'
-import { actorLabel, dateTimeLabel, timeLabel } from '../lib/eventLabels'
+import { useVoucherExpiry } from '../composables/useVoucherExpiry'
+import { useEscapeKey } from '../composables/useEscapeKey'
+import { actorLabel, timeLabel } from '../lib/eventLabels'
 import Critter from './Critter.vue'
 
-const { pendingKisses, pendingRequests, resolveKiss, resolveRequest } = usePetition()
+const { pendingKisses, pendingRequests, resolveKiss, resolveRequest, loading } = usePetition()
 const { myProfile } = useFeed()
 const { iAmHer } = useMilktea()
 
-/** 给她发券要填到期时间，弹层里直接选 */
-const expiresAt = ref(defaultExpiry())
-function defaultExpiry(): string {
-  const d = new Date(Date.now() + 7 * 86400000)
-  const p = (n: number) => String(n).padStart(2, '0')
-  return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}`
-}
-function fmtDay(v: string): string {
-  if (!v) return '没定'
-  const s = dateTimeLabel(`${v}T00:00:00`)
-  const cut = s.indexOf(' ')
-  return cut > 0 ? s.slice(0, cut) : s
-}
+/** 到期日和「奶茶券」面板共用同一个来源，不再自己另算一个今天 +7 */
+const { expiresAt } = useVoucherExpiry()
 
 const busy = ref(false)
 
@@ -102,6 +98,51 @@ function later() {
     /* 存不下也不影响这次 */
   }
 }
+
+/**
+ * 「待会儿」列表以前只增不减：请求被批准 / 驳回之后 id 永远留在本机。
+ * 这里做惰性清理——只在一次加载真正结束后，把已经不存在的请求 id 摘掉。
+ */
+function pruneLater() {
+  const live = new Set<string>([
+    ...pendingKisses.value.map((k) => k.id),
+    ...pendingRequests.value.map((r) => r.id)
+  ])
+  const next = dismissed.value.filter((id) => live.has(id))
+  if (next.length === dismissed.value.length) return
+  dismissed.value = next
+  try {
+    localStorage.setItem(LATER_KEY, JSON.stringify(next))
+  } catch {
+    /* 存不下也不影响这次 */
+  }
+}
+
+/* 数据还没回来时不要清：否则会把「他刚点了待会儿」的 id 误删，
+   下一次刷新又全弹出来。只在 loading 从 true 落回 false 之后清。 */
+let sawLoading = false
+watch(loading, (value) => {
+  if (value) {
+    sawLoading = true
+    return
+  }
+  if (sawLoading) {
+    sawLoading = false
+    pruneLater()
+  }
+})
+watch([pendingKisses, pendingRequests], () => {
+  if (!loading.value) pruneLater()
+})
+
+/* Esc = 「待会儿」：不替他们两个做决定，只是先把这一层收起来 */
+useEscapeKey(
+  () => !!(currentKiss.value || currentMilk.value),
+  () => {
+    if (!busy.value) later()
+  },
+  430
+)
 
 async function answer(status: 'approved' | 'rejected') {
   if (busy.value) return

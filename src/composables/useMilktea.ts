@@ -11,8 +11,9 @@
    实现：不新增表、不需要定时任务，全部从 events 推导。
    ============================================================ */
 
-import { computed, ref } from 'vue'
+import { computed } from 'vue'
 import { useFeed } from './useFeed'
+import { useNow } from './useNow'
 
 /** 最近一个周一 00:00（本地时区） */
 export function weekStart(now: Date = new Date()): Date {
@@ -52,15 +53,9 @@ function fmtDay(d: Date): string {
   return `${d.getFullYear()}-${pad2(d.getMonth() + 1)}-${pad2(d.getDate())}`
 }
 
-// 过期状态需要一个会走的时钟，否则页面一直开着状态不会变
-const nowTick = ref(Date.now())
-let tickTimer = 0
-function ensureTick() {
-  if (tickTimer || typeof window === 'undefined') return
-  tickTimer = window.setInterval(() => {
-    nowTick.value = Date.now()
-  }, 60000)
-}
+// 过期状态需要一个会走的时钟，否则页面一直开着 / 挂后台过夜状态不会变。
+// 用全站共用的 60 秒 tick，不再自己再开一个定时器。
+const nowTick = useNow()
 
 interface VoucherUse {
   at: string
@@ -68,7 +63,6 @@ interface VoucherUse {
 }
 
 export function useMilktea() {
-  ensureTick()
   const { events, publishEvent, myProfile, partnerProfile, myRole, rolesReady, ensureMe, ensurePartner } =
     useFeed()
 
@@ -266,12 +260,18 @@ export function useMilktea() {
   const issuedVouchers = computed(() => vouchers.value.filter((v) => !isWeekly(v.id)))
   const issuedCount = computed(() => issuedVouchers.value.length)
 
+  /** 本周那张免费券（只对外展示这一张；往周的免费只在内部排队） */
+  const weeklyVoucher = computed<MilkteaVoucher | null>(
+    () => vouchers.value.find((v) => isWeekly(v.id)) ?? null
+  )
+
   /** 本周那张免费券还在不在 */
   const freeRemaining = computed(() => {
-    const weekly = vouchers.value.find((v) => isWeekly(v.id))
+    const weekly = weeklyVoucher.value
     return weekly && !weekly.usedAt && !weekly.expired ? 1 : 0
   })
-  const freeUsedThisWeek = computed(() => freeRemaining.value === 0)
+  /** 本周免费的那一杯是不是已经喝掉了（和「过期」分开，不能混成一个 0） */
+  const freeUsedThisWeek = computed(() => !!weeklyVoucher.value?.usedAt)
 
   /** 可用券（他发的、没用掉也没过期） */
   const voucherBalance = computed(
@@ -287,8 +287,22 @@ export function useMilktea() {
     () => vouchersUsed.value + voucherBalance.value + vouchersExpired.value === issuedCount.value
   )
 
+  /** 免费券一共用掉过几杯（所有周，不只本周） */
+  const freeUsedTotal = computed(() => {
+    let n = 0
+    for (const id of usedBy.value.keys()) if (isWeekly(id)) n += 1
+    return n
+  })
+
   /** 她本周还能喝几杯 */
   const drinkable = computed(() => freeRemaining.value + voucherBalance.value)
+
+  /**
+   * 已经喝掉的杯数：他发的券用掉的 + 历次免费喝掉的。
+   * 和「还能喝」「攒着」「过期」用同一套口径，明细里「每一次喝」的数字才对得上。
+   * （他自己喝的不算；见 redeem() 里 source:'self' 的记法）
+   */
+  const drinksUsed = computed(() => vouchersUsed.value + freeUsedTotal.value)
 
   /** 下一次该扣哪一张；都没了返回 null */
   const nextVoucher = computed<MilkteaVoucher | null>(() => {
@@ -358,6 +372,10 @@ export function useMilktea() {
     iAmHer,
     rolesReady,
     issuedCount,
+    /** 他发的券（不含每周免费那一张）：明细里编号只给这一组 */
+    issuedVouchers,
+    /** 本周免费的那一张：明细里单独一块 */
+    weeklyVoucher,
     vouchers,
     /** 所有喝奶茶的记录（明细里要讲清"每一次扣的是什么"） */
     redeems,
@@ -368,6 +386,7 @@ export function useMilktea() {
     freeUsedThisWeek,
     freeRemaining,
     drinkable,
+    drinksUsed,
     canDrink,
     nextVoucher,
     nextSource,

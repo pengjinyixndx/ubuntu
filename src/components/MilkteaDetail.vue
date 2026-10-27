@@ -1,30 +1,46 @@
 <template>
   <PanelShell title="奶茶券和亲亲" @close="emit('close')">
-    <!-- 汇总 -->
+    <!-- 汇总：同一屏里四个数字用同一套口径算出来 -->
     <section class="summary">
-      <div class="cell">
-        <span class="cell-num">{{ freeRemaining }}</span>
-        <span class="cell-label">本周免费还剩</span>
-      </div>
-      <div class="cell">
-        <span class="cell-num">{{ voucherBalance }}</span>
-        <span class="cell-label">可用券</span>
-      </div>
-      <div class="cell">
-        <span class="cell-num">{{ vouchersUsed }}</span>
-        <span class="cell-label">已用掉</span>
-      </div>
-      <div class="cell">
-        <span class="cell-num">{{ vouchersExpired }}</span>
-        <span class="cell-label">已过期</span>
-      </div>
+      <p class="sum-line">还能喝 <b>{{ drinkable }}</b> 杯</p>
+      <p class="sum-line">已经喝掉 <b>{{ drinksUsed }}</b> 杯</p>
+      <p class="sum-line">攒着 <b>{{ voucherBalance }}</b> 张没动</p>
+      <p class="sum-line" :class="{ quiet: !vouchersExpired }">
+        <template v-if="vouchersExpired">有 <b>{{ vouchersExpired }}</b> 张过期了</template>
+        <template v-else>一张也没过期</template>
+      </p>
     </section>
 
-    <!-- 逐张列出来 -->
+    <!-- 每周免费的一周一张：单独一块，不参与他发的券编号 -->
     <section class="block">
-      <details open><summary><h3 class="block-title">每一张券</h3></summary>
+      <h3 class="block-title">每周免费的一杯</h3>
+      <div
+        v-if="weeklyVoucher"
+        class="weekly"
+        :class="{ used: !!weeklyVoucher.usedAt, expired: weeklyVoucher.expired }"
+      >
+        <p class="w-line">
+          {{
+            weeklyVoucher.usedAt
+              ? '这一周已经喝掉了'
+              : weeklyVoucher.expired
+                ? '这一周过去了，没喝上'
+                : '这一周还没喝'
+          }}
+        </p>
+        <p class="v-line"><em>到</em>{{ day(weeklyVoucher.expiresAt) }} 为止</p>
+        <p v-if="weeklyVoucher.usedAt" class="v-line">
+          <em>喝掉的时间</em>{{ stamp(weeklyVoucher.usedAt) }}
+        </p>
+      </div>
+      <p v-else class="empty">这一周的免费还没发下来</p>
+    </section>
 
-      <p v-if="!vouchers.length" class="empty">还没有发过券</p>
+    <!-- 逐张列出来：编号从 1 开始，只给他发的券 -->
+    <section class="block">
+      <details open><summary><h3 class="block-title">他发过的券</h3></summary>
+
+      <p v-if="!issuedVouchers.length" class="empty">他还没发过券</p>
 
       <ul v-else class="vouchers">
         <li
@@ -34,9 +50,9 @@
           :class="{ used: !!v.usedAt, expired: v.expired }"
         >
           <header class="v-head">
-            <span class="v-no">第 {{ vouchers.length - i }} 张</span>
+            <span class="v-no">第 {{ issuedVouchers.length - i }} 张</span>
             <span class="v-state">
-              {{ v.usedAt ? '已使用' : v.expired ? '已过期' : '可用' }}
+              {{ v.usedAt ? '已经喝掉' : v.expired ? '过期了' : '还没用' }}
             </span>
           </header>
 
@@ -71,9 +87,7 @@
         </li>
       </ul>
 
-      <p class="foot-note">
-        这一周免费已经{{ freeRemaining ? '还有' : '用完' }}；券按先发先用，所以第几张券对应第几次用券。
-      </p>
+      <p class="foot-note">券按先发先用。</p>
     </details>
     </section>
     <!-- 亲亲：欠账、额度、以及每一次请求和同意情况 -->
@@ -81,8 +95,8 @@
       <details open><summary><h3 class="block-title">亲亲</h3></summary>
 
       <p class="kiss-sum">
-        <span v-if="iAmHer">小螃蟹欠你 <b>{{ kissDebt }}</b> 个亲亲</span>
-        <span v-else>你欠银杏叶 <b>{{ kissDebt }}</b> 个亲亲</span>
+        <span v-if="iAmHer">你记着小螃蟹 <b>{{ kissDebt }}</b> 个亲亲</span>
+        <span v-else>银杏叶记着你 <b>{{ kissDebt }}</b> 个亲亲</span>
         <span v-if="iAmHer" class="kiss-left">· 今天还能点 {{ freeLeftToday }} 次</span>
       </p>
 
@@ -116,12 +130,22 @@ import PanelShell from './PanelShell.vue'
 
 const emit = defineEmits<{ close: [] }>()
 const { loadEvents } = useFeed()
-const { vouchers, redeems, herId, iAmHer, voucherBalance, vouchersUsed, vouchersExpired, freeRemaining } =
-  useMilktea()
+const {
+  vouchers,
+  issuedVouchers,
+  weeklyVoucher,
+  redeems,
+  herId,
+  iAmHer,
+  voucherBalance,
+  vouchersExpired,
+  drinkable,
+  drinksUsed
+} = useMilktea()
 const { kisses, kissDebt, freeLeftToday } = usePetition()
 
-/** 新的在前 */
-const orderedVouchers = computed(() => [...vouchers.value].reverse())
+/** 新的在前；编号只给「他发的券」，每周免费那张不在这一列里 */
+const orderedVouchers = computed(() => [...issuedVouchers.value].reverse())
 
 /**
  * 每一次喝：谁喝的、扣的是什么。
@@ -313,34 +337,56 @@ details:not([open]) > summary .block-title {
   font-size: var(--fs-xs);
 }
 .summary {
-  display: flex;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
   gap: 8px;
 }
-.cell {
-  flex: 1;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 3px;
-  padding: 13px 4px;
+.sum-line {
+  margin: 0;
+  padding: 11px 12px;
   background-color: var(--photo);
   border: var(--border);
   border-radius: var(--r-sm);
   box-shadow: var(--shadow-card);
-}
-.cell-num {
-  font-family: var(--font-serif);
-  font-size: 26px;
-  font-weight: 700;
-  line-height: 1;
-  color: var(--ink);
-}
-.cell-label {
   font-family: var(--font-song);
-  font-size: 10px;
+  font-size: var(--fs-sm);
   letter-spacing: 0.5px;
-  color: var(--muted);
-  text-align: center;
+  color: var(--ink-soft);
+}
+.sum-line b {
+  margin: 0 2px;
+  font-family: var(--font-serif);
+  font-size: var(--fs-lg);
+  font-weight: 700;
+  color: var(--ink);
+  vertical-align: -2px;
+}
+.sum-line.quiet {
+  color: var(--faint);
+}
+
+/* —— 每周免费那一张（单独一块）—— */
+.weekly {
+  padding: 12px;
+  background-color: var(--paper);
+  border: var(--border-dashed);
+  border-radius: var(--r-sm);
+}
+.weekly.used {
+  opacity: 0.75;
+}
+.weekly.expired {
+  opacity: 0.6;
+}
+.w-line {
+  margin: 0 0 6px;
+  font-family: var(--font-hand);
+  font-size: var(--fs-sm);
+  letter-spacing: 0.5px;
+  color: var(--caramel);
+}
+.weekly.expired .w-line {
+  color: var(--brick);
 }
 
 .block {

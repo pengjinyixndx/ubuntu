@@ -1,6 +1,6 @@
 <template>
   <Teleport to="body">
-    <div class="overlay">
+    <div class="overlay" role="dialog" aria-modal="true" aria-label="记一杯奶茶">
       <header class="editor-bar">
         <button type="button" class="icon-btn" @click="emit('close')" aria-label="关闭">
           <X :size="22" :stroke-width="1.6" />
@@ -81,12 +81,14 @@ import { computed, onMounted, ref } from 'vue'
 import { X, Loader, Camera } from 'lucide-vue-next'
 import { useMilktea } from '../composables/useMilktea'
 import { useFeed } from '../composables/useFeed'
+import { useEscapeKey } from '../composables/useEscapeKey'
 import { TEA_FLAVORS, TEA_SWEETNESS } from '../lib/options'
 import Critter from './Critter.vue'
 import PhotoPicker from './PhotoPicker.vue'
 import PublishFlash from './PublishFlash.vue'
 
 const emit = defineEmits<{ close: [] }>()
+useEscapeKey(() => true, () => emit('close'), 100)
 const { redeem, canDrink } = useMilktea()
 const { uploadPhoto, events, loadEvents } = useFeed()
 
