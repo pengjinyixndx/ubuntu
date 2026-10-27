@@ -345,7 +345,8 @@ function onImgError(e: Event) {
 
 /* 带随手拍时，正文只留 2 行，把版面让给照片 */
 .feed-card.has-photo .content-text {
-  max-height: 3.9em; /* 1.95 × 2 行 */
+  /* 带照片时正文只留 1 行，多出来的高度全给照片（照片要大） */
+  max-height: 1.95em;
 }
 
 /* 带照片的卡片撑满可用高度，剩下的空间全给照片 */
