@@ -349,9 +349,11 @@ function onImgError(e: Event) {
 }
 
 /* 带照片的卡片撑满可用高度，剩下的空间全给照片 */
-/* 带照片的卡片撑满可用高度，剩下的空间全给照片（照片要大） */
 .feed-card.has-photo {
-  height: var(--card-max, 260px);
+  /* 不再固定成 --card-max：卡片高度和首页那个变量解耦，
+     避免任何"变量变→卡片变→再触发重算"的可能。 */
+  height: auto;
+  max-height: var(--card-max, 260px);
 }
 
 /* —— 喝奶茶：要让里面的照片也能跟着卡片伸缩 —— */
@@ -424,15 +426,14 @@ function onImgError(e: Event) {
    以前是 min-height: 0 + img 的 max-height: 100% —— 容器高度等图片、
    图片高度等容器，浏览器会一直重算，表现就是卡片闪烁、版面被不停往上拉。
    图片绝对定位之后就退出了这个循环，仍然按比例完整显示（object-fit: contain）。 */
-/* 照片吃掉剩余空间（尽量大）。
-   容器 relative + 图片绝对定位，图片仍然按比例完整显示，
-   但不会因为"容器等图片、图片等容器"而反复重算。 */
 .note-photo {
+  /* 固定一条带：高度写死，不再参与弹性计算 */
   position: relative;
-  flex: 1 1 auto;
-  min-height: 88px;
+  flex: 0 0 auto;
+  height: 150px;
   margin-top: 10px;
   overflow: hidden;
+  contain: paint;
 }
 .note-photo img {
   position: absolute;
